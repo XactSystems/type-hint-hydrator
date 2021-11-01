@@ -1,0 +1,115 @@
+<?xml version="1.0"?>
+<ruleset name="XactPSR12" namespace="XactSystems\CS\PSR12">
+    <description>A custom coding standard based on PSR12</description>
+
+    <arg name="extensions" value="php,inc" />
+    <arg name="colors"/>
+
+	<exclude-pattern>vendor/*</exclude-pattern>
+
+    <!-- Check for cross-version support for PHP 7.3 and higher using PHPCompatibility. -->
+    <config name="testVersion" value="7.3-"/>
+    <rule ref="PHPCompatibility"/>
+    
+    <rule ref="PSR12">
+		<exclude name="Generic.Files.LineLength.TooLong"/>
+    </rule>
+
+    <rule ref="Generic.Files.LineLength">
+        <properties>
+            <property name="lineLimit" value="120"/>
+            <property name="absoluteLineLimit" value="180"/>
+        </properties>
+    </rule>
+
+    <rule ref="SlevomatCodingStandard.Commenting.DocCommentSpacing">
+        <properties>
+            <property name="linesCountBeforeFirstContent" value="0"/>
+            <property name="linesCountBetweenAnnotationsGroups" value="1"/>
+            <property name="linesCountBetweenDescriptionAndAnnotations" value="1"/>
+            <property name="linesCountAfterLastContent" value="0"/>
+            <property name="annotationsGroups" type="array">
+                <element value="
+                    @var,
+                    @param,
+                    @return,
+                "/>
+                <element value="
+                    @ORM\,
+                    @UniqueEntity,
+                    @Assert\,
+                "/>
+                <element value="
+                    @Serializer\,
+                "/>
+                <element value="
+                    @Route,
+                    @ParamConverter,
+                "/>
+            </property>
+        </properties>
+    </rule>
+    <rule ref="SlevomatCodingStandard.TypeHints.ParameterTypeHint"></rule>
+    <rule ref="SlevomatCodingStandard.TypeHints.ReturnTypeHint"></rule>
+    <rule ref="SlevomatCodingStandard.TypeHints.UselessConstantTypeHint"></rule>
+    <rule ref="SlevomatCodingStandard.Functions.UnusedParameter"></rule>
+    <rule ref="SlevomatCodingStandard.Functions.UselessParameterDefaultValue"></rule>
+    <rule ref="SlevomatCodingStandard.Namespaces.UnusedUses">
+        <properties>
+            <property name="searchAnnotations " value="true"/>
+        </properties>
+    </rule>
+    <rule ref="SlevomatCodingStandard.Variables.UselessVariable"></rule>
+
+    <rule ref="Generic.PHP.ForbiddenFunctions">
+        <properties>
+            <property name="forbiddenFunctions" type="array">
+                <!-- Symfony dump method -->
+                <element key="dump" value="null"/>
+                <!-- Deprecated Features 7.0, https://secure.php.net/manual/en/migration70.deprecated.php -->
+                <element key="ldap_sort" value="null"/>
+                <!-- Deprecated Features 7.1, https://secure.php.net/manual/en/migration71.deprecated.php -->
+                <!-- Deprecated Features 7.2, https://secure.php.net/manual/en/migration72.deprecated.php -->
+                <element key="create_function" value="null"/>
+                <element key="each" value="null"/>
+                <element key="gmp_random" value="null"/>
+                <element key="read_exif_data" value="exif_read_data"/>
+                <element key="png2wbmp" value="null"/>
+                <element key="jpeg2wbmp" value="null"/>
+                <element key="__autoload" value="null"/>
+                <!-- Deprecated Features 7.3, https://secure.php.net/manual/en/migration73.deprecated.php -->
+                <!-- Searching Strings for non-string Needle -->
+                <!--
+                <element key="strpos" value="chr"/>
+                <element key="strrpos" value="chr"/>
+                <element key="stripos" value="chr"/>
+                <element key="strstr" value="chr"/>
+                <element key="stristr" value="chr"/>
+                <element key="strchr" value="chr"/>
+                <element key="strrchr" value="chr"/>
+                -->
+                <!-- Strip-Tags Streaming -->
+                <element key="fgetss" value="fgets"/>
+                <element key="gzgets" value="gzgets"/>
+                <!-- Image Processing and GD -->
+                <element key="image2wbmp" value="imagewbmp"/>
+                <!-- Multibyte String -->
+                <element key="mbregex_encoding" value="mb_regex_encoding"/>
+                <element key="mbreg" value="mb_ereg"/>
+                <element key="mbregi" value="mb_eregi"/>
+                <element key="mbreg_replace" value="mb_ereg_replace"/>
+                <element key="mbregi_replace" value="mb_eregi_replace"/>
+                <element key="mbsplit" value="mb_split"/>
+                <element key="mbreg_match" value="mb_ereg_match"/>
+                <element key="mbreg_search" value="mb_ereg_search"/>
+                <element key="mbreg_search_post" value="mb_ereg_search_post"/>
+                <element key="mbreg_search_regs" value="mb_ereg_search_regs"/>
+                <element key="mbreg_search_init" value="mb_ereg_search_init"/>
+                <element key="mbreg_search_getregs" value="mb_ereg_search_getregs"/>
+                <element key="mbreg_search_getpos" value="mb_ereg_search_getpos"/>
+                <element key="mbreg_search_setpos" value="mb_ereg_search_setpos"/>
+            </property>
+        </properties>
+    </rule>
+
+</ruleset>

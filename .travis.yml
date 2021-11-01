@@ -1,0 +1,29 @@
+language: php
+sudo: false
+cache:
+    directories:
+        - $HOME/.composer/cache/files
+        - $HOME/symfony-bridge/.phpunit
+env:
+    global:
+        - PHPUNIT_FLAGS="-v --group=scheduler"
+        - SYMFONY_PHPUNIT_DIR="$HOME/symfony-bridge/.phpunit"
+        - COMPOSER_MEMORY_LIMIT=-1
+
+matrix:
+    fast_finish: true
+    include:
+          # Test the 3.4 LTS release
+        - php: 7.2
+          env: SYMFONY="4.4.*"
+        - php: 7.3
+          env: SYMFONY="4.4.*"
+
+install:
+    -  travis_retry composer install --no-interaction --prefer-dist
+
+script:
+    # simple-phpunit is the PHPUnit wrapper provided by the PHPUnit Bridge component and
+    # it helps with testing legacy code and deprecations (composer require symfony/phpunit-bridge)
+    - export SYMFONY_DEPRECATIONS_HELPER=disabled
+    - ./vendor/bin/simple-phpunit $PHPUNIT_FLAGS
