@@ -10,13 +10,13 @@ use ReflectionProperty;
 class PropertyTypeHintStrategy implements StrategyInterface
 {
     /**
-     * @var \Xact\TypeHintHydrator\PropertyConvertor
+     * @var \Xact\TypeHintHydrator\PropertyConverter
      */
-    protected $convertor;
+    protected $Converter;
 
     public function __construct(ReflectionProperty $property, EntityManagerInterface $em, ReflectionClass $targetClass, TypeHintHydrator $hydrator, object $targetObject)
     {
-        $this->convertor = new PropertyConvertor($property, $em, $targetClass, $hydrator, $targetObject);
+        $this->Converter = new PropertyConverter($property, $em, $targetClass, $hydrator, $targetObject);
     }
 
     /**
@@ -42,6 +42,6 @@ class PropertyTypeHintStrategy implements StrategyInterface
      // phpcs:ignore SlevomatCodingStandard.Functions.UnusedParameter.UnusedParameter
     public function hydrate($value, ?array $data = null)
     {
-        return $this->convertor->convert($value);
+        return $this->Converter->convert($value);
     }
 }

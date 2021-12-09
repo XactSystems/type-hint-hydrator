@@ -9,6 +9,8 @@ use ReflectionClass;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Validator\ConstraintViolationListInterface;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
+use Xact\TypeHintHydrator\Converter\Converter;
+use Xact\TypeHintHydrator\Converter\ConverterInterface;
 
 class TypeHintHydrator
 {
@@ -49,11 +51,28 @@ class TypeHintHydrator
      */
     protected $reflectionTarget;
 
+    /**
+     * @var \Xact\TypeHintHydrator\Converter\ConverterInterface
+     */
+    protected $typeConverter;
+
     public function __construct(ValidatorInterface $validator, EntityManagerInterface $em, SerializerInterface $serializer)
     {
         $this->validator = $validator;
         $this->em = $em;
         $this->serializer = $serializer;
+        $this->typeConverter = new Converter();
+    }
+
+    public function setConverter(ConverterInterface $converter): self
+    {
+        $this->typeConverter = $converter;
+        return $this;
+    }
+
+    public function getConverter(): ConverterInterface
+    {
+        return $this->typeConverter;
     }
 
     /**

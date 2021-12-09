@@ -11,7 +11,7 @@ use Nette\Utils\Strings;
 use ReflectionClass;
 use ReflectionProperty;
 
-class PropertyConvertor
+class PropertyConverter
 {
     /**
      * @var \Doctrine\ORM\EntityManagerInterface
@@ -66,12 +66,7 @@ class PropertyConvertor
     /**
      * @var string[]
      */
-    protected $convertibleTypes = [
-        'int' => 'intval',
-        'bool' => 'filter_var',
-        'float' => 'floatval',
-        'string' => 'strval',
-    ];
+    protected $convertibleTypes = [];
 
     protected $entityHydrator;
 
@@ -179,19 +174,12 @@ class PropertyConvertor
     protected function convertToNativeTypeOrEntity($value, string $type)
     {
         // Attempt to cast to native types or entities.
-        $castTo = null;
         do {
-            if (array_key_exists($type, $this->convertibleTypes)) {
-                // dump(['field' => $this->propertyName, 'value' => $value, 'type' => $type, 'castTo' => $this->convertibleTypes[$type]]);
-                $castTo = $this->convertibleTypes[$type];
-                break;
+            $converter = $this->entityHydrator->getConverter();
+            if ($converter->canConvert($type)) {
+                return $converter->convert($type, $value);
             }
-            if ($type === 'DateTime' || $type === '\DateTime') {
-                $castTo = function ($value) {
-                    return new \DateTime($value);
-                };
-                break;
-            }
+
             // If it's a class, see if it's an entity, or instantiate it, and hydrate it
             if (class_exists($type)) {
                 if (is_string($value)) {
@@ -224,7 +212,7 @@ class PropertyConvertor
                                 /**
                                  * Instantiate the entity and set the id property to null.
                                  * Most entities will be defined with a non nullable id property,
-                                 * so if they are say an int they would get set to zero be default.
+                                 * so if they are, say an int, they would get set to zero be default.
                                  */
                                 $entity = new $type();
                                 $entityReflection = new ReflectionClass($entity);
@@ -259,10 +247,6 @@ class PropertyConvertor
                 }
             }
         } while (false);
-
-        if ($castTo) {
-            return $castTo($value);
-        }
 
         return $value;
     }
