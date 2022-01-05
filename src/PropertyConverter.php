@@ -9,90 +9,51 @@ use Doctrine\Persistence\Mapping\MappingException as PersistenceMappingException
 use Nette\Utils\Arrays;
 use Nette\Utils\Strings;
 use ReflectionClass;
+use ReflectionNamedType;
 use ReflectionProperty;
+use ReflectionUnionType;
 
 class PropertyConverter
 {
-    /**
-     * @var \Doctrine\ORM\EntityManagerInterface
-     */
-    protected $em;
-
-    /**
-     * @var \ReflectionClass
-     */
-    protected $targetClass;
-
-    /**
-     * @var string
-     */
-    protected $propertyName;
-
-    /**
-     * @var bool
-     */
-    protected $hasTypeDeclaration;
-
-    /**
-     * @var bool
-     */
-    protected $hasDefaultValue;
-
-    /**
-     * @var bool
-     */
-    protected $isNullable;
-
-    /**
-     * @var bool
-     */
-    protected $isMixed;
-
-    /**
-     * @var bool
-     */
-    protected $isMixedArray;
+    protected EntityManagerInterface $em;
+    protected ReflectionClass $targetClass;
+    protected ReflectionProperty $targetProperty;
+    protected TypeHintHydrator $entityHydrator;
+    protected object $targetObject;
+    protected string $propertyName;
+    protected bool $hasTypeHint = false;
+    protected bool $hasDefaultValue = false;
+    protected bool $isNullable = false;
+    protected bool $isMixed = false;
+    protected bool $isMixedArray = false;
+    protected bool $isIterable = false;
 
     /**
      * @var string[]
      */
-    protected $allowedTypes;
+    protected array $allowedTypes;
 
     /**
      * @var string[]
      */
-    protected $allowedArrayTypes;
+    protected array $allowedArrayTypes;
 
     /**
      * @var string[]
      */
-    protected $convertibleTypes = [];
+    protected array $convertibleTypes = [];
 
-    protected $entityHydrator;
+    protected array $ignoredDeclaredTypes = ['self', 'parent', 'callable', 'object'];
 
     public function __construct(ReflectionProperty $property, EntityManagerInterface $em, ReflectionClass $targetClass, TypeHintHydrator $entityHydrator, object $targetObject)
     {
         $this->em = $em;
         $this->targetProperty = $property;
         $this->targetClass = $targetClass;
-        $this->targetObject = $targetObject;
         $this->entityHydrator = $entityHydrator;
+        $this->targetObject = $targetObject;
 
-        $matches = Strings::match($property->getDocComment(), '/@var ((?:(?:[\w?|\\\\<>])+(?:\[])?)+)/');
-
-        $definition = is_array($matches) ? $matches[1] : '';
-
-        $this->propertyName = $property->getName();
-        $this->hasTypeDeclaration = $definition !== '';
-        $this->hasDefaultValue = $property->isDefault();
-        $this->isNullable = $this->resolveNullable($definition);
-        $this->isMixed = $this->resolveIsMixed($definition);
-        $this->isMixedArray = $this->resolveIsMixedArray($definition);
-        $this->allowedTypes = $this->resolveAllowedTypes($definition);
-        $this->allowedArrayTypes = $this->resolveAllowedArrayTypes($definition);
-
-        $classMetadata = $entityHydrator->getClassMetadata();
-        $this->propertyMetadata = $classMetadata->getPropertyMetadata($this->propertyName);
+        $this->configureTypeAttributes();
     }
 
     /**
@@ -171,7 +132,7 @@ class PropertyConverter
      * @param mixed $value
      * @return mixed
      */
-    protected function convertToNativeTypeOrEntity($value, string $type)
+    private function convertToNativeTypeOrEntity($value, string $type)
     {
         // Attempt to cast to native types or entities.
         do {
@@ -251,6 +212,74 @@ class PropertyConverter
         return $value;
     }
 
+    protected function configureTypeAttributes(): void
+    {
+        $property = $this->targetProperty;
+        $definition = '';
+        // If we have a declared type for the property, use that as the primary type
+        if ($property->hasType()) {
+            $definition = $this->getPropertyTypeNames($property);
+        }
+
+        // If the @var annotation exists, append those types. For iterable types we use the @var definition for the array type.
+        $matches = Strings::match($property->getDocComment(), '/@var ((?:(?:[\w?|\\\\<>])+(?:\[])?)+)/');
+        $varTypes = is_array($matches) ? $matches[1] : '';
+        if ($varTypes) {
+            $this->hasTypeHint = true;
+
+            // If we have an iterable declared type, use the type hint to suggest the array type
+            if ($this->resolveIsIterable($definition)) {
+                $definition = $varTypes;
+            } else {
+                // Otherwise the declared type takes precedence
+                $definition .= ($definition ? '|' : '') . $varTypes;
+            }
+        }
+
+        $this->propertyName = $property->getName();
+        $this->isMixed = $this->resolveIsMixed($definition);
+        $this->isMixedArray = $this->resolveIsMixedArray($definition);
+        $this->isNullable = $this->resolveNullable($definition);
+        $this->isIterable = $this->resolveIsIterable($definition);
+        $this->allowedTypes = $this->normaliseTypes(...explode('|', $definition));
+        $this->allowedArrayTypes = $this->resolveAllowedArrayTypes($definition);
+        if (PHP_MAJOR_VERSION >= 8) {
+            $this->hasDefaultValue = $property->hasDefaultValue();
+        }
+
+        $classMetadata = $this->entityHydrator->getClassMetadata();
+        $this->propertyMetadata = $classMetadata->getPropertyMetadata($this->propertyName);
+    }
+
+    private function getPropertyTypeNames(ReflectionProperty $property): string
+    {
+        $reflectionType = $property->getType();
+        switch (get_class($reflectionType)) {
+            case ReflectionNamedType::class:
+                return $this->resolveTypedProperty($reflectionType);
+            case ReflectionUnionType::class:
+            case ReflectionIntersectionType::class:
+                $types = '';
+                foreach ($reflectionType->getTypes() as $type) {
+                    $type .= ($types ? '|' : '') . $this->resolveTypedProperty($type);
+                }
+                return $types;
+        }
+
+        return '';
+    }
+
+    private function resolveTypedProperty(ReflectionNamedType $type): string
+    {
+        $resolvedType = '';
+        $typeName = $type->getName();
+        if (!in_array($typeName, $this->ignoredDeclaredTypes)) {
+            $resolvedType = $typeName . ($type->allowsNull() ? '|null' : '');
+        }
+
+        return $resolvedType;
+    }
+
     private function resolveNullable(string $definition): bool
     {
         if (! $definition) {
@@ -262,6 +291,11 @@ class PropertyConverter
         }
 
         return false;
+    }
+
+    private function resolveIsIterable(string $definition): bool
+    {
+        return (Strings::contains($definition, 'array') || Strings::contains($definition, 'iterable'));
     }
 
     private function resolveIsMixed(string $definition): bool
@@ -285,14 +319,6 @@ class PropertyConverter
     /**
      * @return string[]
      */
-    private function resolveAllowedTypes(string $definition): array
-    {
-        return $this->normaliseTypes(...explode('|', $definition));
-    }
-
-    /**
-     * @return string[]
-     */
     private function resolveAllowedArrayTypes(string $definition): array
     {
         return $this->normaliseTypes(...array_map(
@@ -307,6 +333,10 @@ class PropertyConverter
 
                 if (strpos($type, 'iterable<') !== false) {
                     return str_replace(['iterable<', '>'], ['', ''], $type);
+                }
+
+                if (strpos($type, 'array<') !== false) {
+                    return str_replace(['array<', '>'], ['', ''], $type);
                 }
 
                 return null;
