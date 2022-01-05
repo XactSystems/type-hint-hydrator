@@ -1,5 +1,5 @@
 # type-hint-hydrator
-A Symfony Type Hint hydrator that uses @var annotations to determine the hydrated type.
+A Symfony Type Hint hydrator that uses declared types and @var annotations to determine the hydrated type.
 Under the hood it uses the laminas-hydrator for the mapping process. See https://github.com/laminas/laminas-hydrator/
 
 It can handle request objects and arrays of data to hydrate annotated classes and arrays etc. It can also validate against any Assert annotations the hydrated object may contain.
@@ -25,7 +25,7 @@ Symfony 4.4 onwards - bundles.php
     ];
 ```
 
-### 3) Annotate your hydrated object properties
+### 3) Declare types or annotate your hydrated object properties
 ```php
 namespace App;
 
@@ -34,22 +34,38 @@ class Author
     /**
      * @var int|null
      */
-    public $objectID;
+    public $objectId;
+
+    public int $noneNullId;
 
     /**
      * @var string|null
      */
     public $fullName;
 
+    public float $myFloat;
+
     /**
-     * \App\Book[]
+     * @var \App\Book[]
      */
     public $books;
+
+    /**
+     * @var \App\Authors[]
+     */
+    public array $authors;
+
+    /**
+     * @var array<\App\References>
+     */
+    public array $references;
 }
 ```
 
 ### 4) Hydrate your object in your controller
 ```php
+    use Xact\TypeHintHydrator\TypeHintHydrator;
+    ...
     public function update(Request $request, EntityManagerInterface $em, TypeHintHydrator $hydrator): JsonResponse
     {
         $author = new Author();
@@ -67,6 +83,8 @@ class Author
 
 Or to update and existing entity:
 ```php
+    use Xact\TypeHintHydrator\TypeHintHydrator;
+    ...
     /**
      * @Route("/author/{id}", methods={"POST"})
      * @ParamConverter("author", class="App\Entity\Author")
