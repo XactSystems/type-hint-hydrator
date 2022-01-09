@@ -142,58 +142,23 @@ class PropertyConverter
             }
 
             // If it's a class, see if it's an entity, or instantiate it, and hydrate it
-            if (class_exists($type)) {
-                if (is_string($value)) {
-                    // If it's an entity and an association exists for this property, attempt to load the entity
+            if (class_exists($this->prefixClass($type))) {
+                $propertyClass = $this->prefixClass($type);
+                if (is_string($value) && !$this->propertyMetadata->skipFind) {
                     try {
-                        $targetMeta = $this->em->getClassMetadata($this->targetClass->getName());
-                        if (!$this->propertyMetadata->skipFind && $targetMeta->hasAssociation($this->propertyName)) {
-                            $association = $targetMeta->getAssociationMapping($this->propertyName);
-                            // Sanity check that the association target is what we've detected as the property type
-                            if ($this->prefixClass($type) === $this->prefixClass($association['targetEntity'])) {
-                                $this->em->getClassMetadata($type)->getSingleIdentifierFieldName();
-                                return $this->em->getRepository($type)->find($value);
-                            }
-                        }
-                    } catch (MappingException $e) {
-                        // Ignore, the class is not an entity, has no association, or the identifier is composite
-                    } catch (PersistenceMappingException $e) {
+                        // If property type is an entity, and we have an array of values for it, try and load and hydrate that entity
+                        $this->em->getClassMetadata($propertyClass)->getSingleIdentifierFieldName();
+                        return $this->em->getRepository($propertyClass)->find($value);
+                    } catch (MappingException | PersistenceMappingException $e) {
+                        // Ignore, it's either not an entity or the key does not exist
                     }
                 }
 
+                // If we have an array of values, instantiate the class and fill it
                 if (is_array($value)) {
-                    try {
-                        // If property type is an entity, and we have an array of values for it, try and load and hydrate that entity
-                        $idField = $this->em->getClassMetadata($type)->getSingleIdentifierFieldName();
-                        if (array_key_exists($idField, $value)) {
-                            /** @var object|null */
-                            $entity = null;
-                            $id = $value[$idField];
-                            if (empty($id)) {
-                                /**
-                                 * Instantiate the entity and set the id property to null.
-                                 * Most entities will be defined with a non nullable id property,
-                                 * so if they are, say an int, they would get set to zero be default.
-                                 */
-                                $entity = new $type();
-                                $entityReflection = new ReflectionClass($entity);
-                                $idProperty = $entityReflection->getProperty($idField);
-                                $idProperty->setAccessible(true);
-                                $idProperty->setValue($entity, null);
-                            } elseif (!$this->propertyMetadata->skipFind) {
-                                $entity = $this->em->getRepository($type)->find($id);
-                            }
-                            if (!$this->propertyMetadata->skipHydrate) {
-                                $this->entityHydrator->hydrateObject($value, $entity, false);
-                            }
-                            return $entity;
-                        }
-                    } catch (MappingException $e) {
-                        // Ignore, the class is not an entity, does not have an identity or the identifier is composite
-                    } catch (PersistenceMappingException $e) {
-                    }
-
-                    // Not an entity so try and create an instance of the class and hydrate it
+                    /**
+                     * Instantiate the class and hydrate the object.
+                     */
                     try {
                         $targetObject = new $type();
                         $this->entityHydrator->hydrateObject($value, $targetObject, false);
@@ -295,7 +260,11 @@ class PropertyConverter
 
     private function resolveIsIterable(string $definition): bool
     {
-        return (Strings::contains($definition, 'array') || Strings::contains($definition, 'iterable'));
+        return (
+            Strings::contains($definition, 'array')
+            || Strings::contains($definition, 'iterable')
+            || Strings::endsWith($definition, '[]')
+        );
     }
 
     private function resolveIsMixed(string $definition): bool
