@@ -144,6 +144,10 @@ class PropertyConverter
             // If it's a class, see if it's an entity, or instantiate it, and hydrate it
             if (class_exists($this->prefixClass($type))) {
                 $propertyClass = $this->prefixClass($type);
+
+                /**
+                 * The property is a string - if it's am entity try and find it
+                 */
                 if (is_string($value) && !$this->propertyMetadata->skipFind) {
                     try {
                         // If property type is an entity, and we have an array of values for it, try and load and hydrate that entity
@@ -154,8 +158,25 @@ class PropertyConverter
                     }
                 }
 
-                // If we have an array of values, instantiate the class and fill it
-                if (is_array($value)) {
+                /**
+                 * The property is an array.
+                 * If and we have the ID field, try and find and hydrate it.
+                 * If we don't have the ID field, instantiate a new object and hydrate that.
+                 */
+                if (is_array($value) && !$this->propertyMetadata->skipFind) {
+                    try {
+                        // If property type is an entity, and we have the ID field in the values list, try and find and hydrate that entity
+                        $idField = $this->em->getClassMetadata($type)->getSingleIdentifierFieldName();
+                        if (array_key_exists($idField, $value) && !empty($value[$idField])) {
+                            $entity = $this->em->getRepository($propertyClass)->find($value[$idField]);
+                            $this->entityHydrator->hydrateObject($value, $entity, false);
+                            return $entity;
+                        }
+                    } catch (MappingException $e) {
+                        // Ignore, the class is not an entity, does not have an identity or the identifier is composite
+                    } catch (PersistenceMappingException $e) {
+                    }
+
                     /**
                      * Instantiate the class and hydrate the object.
                      */
