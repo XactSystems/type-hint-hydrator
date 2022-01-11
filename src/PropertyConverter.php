@@ -66,7 +66,7 @@ class PropertyConverter
          * String types can receive the value as is as the
          * Request parameters are all string values or arrays.
          */
-        if (Arrays::contains($this->allowedTypes, 'string') && is_string($value)) {
+        if (Arrays::contains($this->allowedTypes, 'string') && is_scalar($value)) {
             return $value;
         }
 
@@ -148,7 +148,7 @@ class PropertyConverter
                 /**
                  * The property is a string - if it's am entity try and find it
                  */
-                if (is_string($value) && !$this->propertyMetadata->skipFind) {
+                if (is_scalar($value) && !$this->propertyMetadata->skipFind) {
                     try {
                         // If property type is an entity, and we have an array of values for it, try and load and hydrate that entity
                         $this->em->getClassMetadata($propertyClass)->getSingleIdentifierFieldName();
