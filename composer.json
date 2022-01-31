@@ -1,7 +1,7 @@
 {
     "name": "xactsystems/type-hint-hydrator",
     "description": "A Symfony object hydrator based on declared types and annotation type-hints.",
-    "version": "2.0.6",
+    "version": "2.0.7",
     "type": "symfony-bundle",
     "license": "MIT",
     "authors": [
