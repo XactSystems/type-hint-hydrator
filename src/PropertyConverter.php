@@ -2,11 +2,11 @@
 
 namespace Xact\TypeHintHydrator;
 
-use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Mapping\MappingException;
 use Doctrine\Persistence\Mapping\MappingException as PersistenceMappingException;
+use InvalidArgumentException;
 use Nette\Utils\Arrays;
 use Nette\Utils\Strings;
 use ReflectionClass;
@@ -101,26 +101,24 @@ class PropertyConverter
             * to convert each element to type, then add it to
             * the collection.
             */
-            if ($convertedValue === null && is_array($value) && Strings::endsWith($type, '>')) {
+            if ($convertedValue === null && is_array($value)) {
                 $this->targetProperty->setAccessible(true);
                 $targetProperty = $this->targetProperty->getValue($this->targetObject);
                 if (is_subclass_of($targetProperty, Collection::class)) {
-                    $matches = Strings::match($type, '/(?:<)(\\\[\w\\\]*)(?:>)/');
-                    if ($matches !== null) {
-                        $realType = $matches[1];
-                        $convertedValue = $targetProperty;
-                        // Merge the hydrated children with the existing collection, deleting those that no longer exist.
-                        $hydratedChildren = new ArrayCollection();
-                        foreach ($value as $subItem) {
-                            $child = $this->convertToNativeTypeOrEntity($subItem, $realType);
-                            $hydratedChildren->add($child);
-                            $convertedValue->add($child);
-                        }
-                        foreach ($convertedValue as $oldChild) {
-                            if (!$hydratedChildren->contains($oldChild)) {
-                                $targetProperty->removeElement($oldChild);
+                    if (Strings::endsWith($type, '>')) {
+                        $matches = [];
+                        if (preg_match('/(?:<)(.*)(?:>)/', $type, $matches) === 1) {
+                            $realType = $matches[1];
+                            $convertedValue = $targetProperty;
+                            foreach ($value as $subItem) {
+                                $convertedValue->add($this->convertToNativeTypeOrEntity($subItem, $realType));
                             }
+                        } else {
+                            throw new InvalidArgumentException("Expected a Collection type hinted by <type> but found '{$type}' for property {$this->propertyName}.");
                         }
+                    } else {
+                        // Skip Collection class allowed types that don't have an array type hint
+                        continue;
                     }
                 }
             }
