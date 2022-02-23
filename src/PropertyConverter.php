@@ -2,6 +2,7 @@
 
 namespace Xact\TypeHintHydrator;
 
+use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Mapping\MappingException;
@@ -118,9 +119,19 @@ class PropertyConverter
                         $subType = $matches[2];
                         if (is_a($propertyType, Collection::class, true)) {
                             $this->targetProperty->setAccessible(true);
+                            /** @var Collection */
                             $convertedValue = $this->targetProperty->getValue($this->targetObject);
+                            // Merge the hydrated children with the existing collection, deleting those that no longer exist.
+                            $hydratedChildren = new ArrayCollection();
                             foreach ($value as $subItem) {
-                                $convertedValue->add($this->convertToNativeTypeOrEntity($subItem, $subType));
+                                $child = $this->convertToNativeTypeOrEntity($subItem, $subType);
+                                $convertedValue->add($child);
+                                $hydratedChildren->add($child);
+                            }
+                            foreach ($convertedValue as $oldChild) {
+                                if (!$hydratedChildren->contains($oldChild)) {
+                                    $convertedValue->removeElement($oldChild);
+                                }
                             }
                         }
                     }
