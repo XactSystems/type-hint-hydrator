@@ -6,7 +6,6 @@ use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Mapping\MappingException;
 use Doctrine\Persistence\Mapping\MappingException as PersistenceMappingException;
-use InvalidArgumentException;
 use Nette\Utils\Arrays;
 use Nette\Utils\Strings;
 use ReflectionClass;
@@ -64,16 +63,14 @@ class PropertyConverter
     public function convert($value)
     {
         /**
-         * String types can receive the value as is as the
-         * Request parameters are all string values or arrays.
+         * String types can receive the value as is as the Request parameters are all string values or arrays.
          */
         if (Arrays::contains($this->allowedTypes, 'string') && is_scalar($value)) {
             return $value;
         }
 
         /**
-         * If the value is empty and this property is
-         * nullable, return null.
+         * If the value is empty and this property is nullable, return null.
          */
         if (($value === null || $value === '') && $this->isNullable) {
             return null;
@@ -83,10 +80,9 @@ class PropertyConverter
             $convertedValue = null;
 
             /**
-            * If the value is an array and the type ends in [],
-            * process the value as an array and try to convert
-            * each element to type.
-            */
+             * If the value is an array and the type ends in [], process the value as an array and try
+             * to convert each element to type.
+             */
             if (is_array($value) && Strings::endsWith($type, '[]')) {
                 $realType = Strings::before($type, '[]');
                 $convertedValue = [];
@@ -96,29 +92,37 @@ class PropertyConverter
             }
 
             /**
-            * If the value is an array and it's a typed Doctrine
-            * collection, process the value as an array and try
-            * to convert each element to type, then add it to
-            * the collection.
-            */
+             * If the value is an array and it's a typed Doctrine collection, process the value as an array
+             * and try to convert each element to type, then add it to the collection.
+             */
             if ($convertedValue === null && is_array($value)) {
-                $this->targetProperty->setAccessible(true);
-                $targetProperty = $this->targetProperty->getValue($this->targetObject);
-                if (is_subclass_of($targetProperty, Collection::class)) {
-                    if (Strings::endsWith($type, '>')) {
-                        $matches = [];
-                        if (preg_match('/(?:<)(.*)(?:>)/', $type, $matches) === 1) {
-                            $realType = $matches[1];
-                            $convertedValue = $targetProperty;
+                /**
+                 * Skip Collection class without a subtype. This will be the >= 7.4 typed property definition.
+                 * If this is the only allowed type, no @var, simply add the value to the collection.
+                 */
+                if (!Strings::contains($type, '<') && is_a($type, Collection::class, true)) {
+                    if (count($this->allowedTypes) > 1) {
+                        continue; // Wait for the @var definition with the <subtype>
+                    }
+                    // Simply add the values to the collection
+                    $this->targetProperty->setAccessible(true);
+                    $convertedValue = $this->targetProperty->getValue($this->targetObject);
+                    foreach ($value as $itemValue) {
+                        $convertedValue->add($itemValue);
+                    }
+                } else {
+                    // Try and match Doctrine\Common\Collections\Collection<App\MyEntity>
+                    $matches = Strings::match($type, '/(.*)(?:<)(.*)(?:>)/');
+                    if ($matches !== null) {
+                        $propertyType = $matches[1];
+                        $subType = $matches[2];
+                        if (is_a($propertyType, Collection::class, true)) {
+                            $this->targetProperty->setAccessible(true);
+                            $convertedValue = $this->targetProperty->getValue($this->targetObject);
                             foreach ($value as $subItem) {
-                                $convertedValue->add($this->convertToNativeTypeOrEntity($subItem, $realType));
+                                $convertedValue->add($this->convertToNativeTypeOrEntity($subItem, $subType));
                             }
-                        } else {
-                            throw new InvalidArgumentException("Expected a Collection type hinted by <type> but found '{$type}' for property {$this->propertyName}.");
                         }
-                    } else {
-                        // Skip Collection class allowed types that don't have an array type hint
-                        continue;
                     }
                 }
             }
