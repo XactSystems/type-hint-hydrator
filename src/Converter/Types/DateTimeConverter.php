@@ -13,6 +13,6 @@ class DateTimeConverter implements TypeConverterInterface
      */
     public static function convert($value): DateTime
     {
-        return new \DateTime($value);
+        return ($value instanceof \DateTime ? $value : new \DateTime($value));
     }
 }
