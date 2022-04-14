@@ -8,23 +8,24 @@ use Xact\TypeHintHydrator\Annotation\Exclude;
 use Xact\TypeHintHydrator\Annotation\SkipFind;
 use Xact\TypeHintHydrator\Annotation\SkipHydrate;
 use Doctrine\Common\Annotations\AnnotationReader;
+use Doctrine\Common\Annotations\PhpParser;
+use ReflectionClass;
 
 class AnnotationHandler
 {
-    /**
-     * @var AnnotationReader
-     */
-    protected $reader;
+    protected AnnotationReader $reader;
+    protected PhpParser $phpParser;
 
     public function __construct()
     {
         $this->reader = new AnnotationReader();
+        $this->phpParser = new PhpParser();
     }
 
-    public function loadMetadataForClass(\ReflectionClass $class): ClassMetadata
+    public function loadMetadataForClass(ReflectionClass $class): ClassMetadata
     {
-        $name = $class->name;
-        $classMetadata = new ClassMetadata($name);
+        $className = $class->name;
+        $classMetadata = new ClassMetadata($class);
 
         foreach ($this->reader->getClassAnnotations($class) as $annotation) {
             if ($annotation instanceof Exclude) {
@@ -33,7 +34,7 @@ class AnnotationHandler
         }
 
         foreach ($class->getProperties() as $property) {
-            if ($property->class !== $name || (isset($property->info) && $property->info['class'] !== $name)) {
+            if ($property->class !== $className || (isset($property->info) && $property->info['class'] !== $className)) {
                 continue;
             }
 
@@ -49,6 +50,7 @@ class AnnotationHandler
                 }
             }
             $classMetadata->setPropertyMetadata($propertyMetadata);
+            $classMetadata->setUseStatements($this->phpParser->parseUseStatements($class));
         }
 
         return $classMetadata;

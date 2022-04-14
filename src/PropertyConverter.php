@@ -46,8 +46,13 @@ class PropertyConverter
 
     protected array $ignoredDeclaredTypes = ['self', 'parent', 'callable', 'object'];
 
-    public function __construct(ReflectionProperty $property, EntityManagerInterface $em, ReflectionClass $targetClass, TypeHintHydrator $entityHydrator, object $targetObject)
-    {
+    public function __construct(
+        ReflectionProperty $property,
+        EntityManagerInterface $em,
+        ReflectionClass $targetClass,
+        TypeHintHydrator $entityHydrator,
+        object $targetObject
+    ) {
         $this->em = $em;
         $this->targetProperty = $property;
         $this->targetClass = $targetClass;
@@ -115,11 +120,11 @@ class PropertyConverter
                     // Try and match Doctrine\Common\Collections\Collection<App\MyEntity>
                     $matches = Strings::match($type, '/(.*)(?:<)(.*)(?:>)/');
                     if ($matches !== null) {
-                        $propertyType = $matches[1];
-                        $subType = $matches[2];
+                        $propertyType = $this->getQualifiedClassName($matches[1]);
+                        $subType = $this->getQualifiedClassName($matches[2]);
                         if (is_a($propertyType, Collection::class, true)) {
                             $this->targetProperty->setAccessible(true);
-                            /** @var Collection */
+                            /* @var Collection */
                             $convertedValue = $this->targetProperty->getValue($this->targetObject);
                             // Merge the hydrated children with the existing collection, deleting those that no longer exist.
                             $hydratedChildren = new ArrayCollection();
@@ -283,6 +288,7 @@ class PropertyConverter
         $resolvedType = '';
         $typeName = $type->getName();
         if (!in_array($typeName, $this->ignoredDeclaredTypes)) {
+            $typeName = $this->getQualifiedClassName($typeName);
             $resolvedType = $typeName . ($type->allowsNull() ? '|null' : '');
         }
 
@@ -308,6 +314,8 @@ class PropertyConverter
             Strings::contains($definition, 'array')
             || Strings::contains($definition, 'iterable')
             || Strings::endsWith($definition, '[]')
+            || Strings::contains($definition, '<') && Strings::endsWith($definition, '>')
+            || (class_exists($definition) || interface_exists($definition)) && array_key_exists(\Traversable::class, class_implements($definition))
         );
     }
 
@@ -374,5 +382,14 @@ class PropertyConverter
     private function prefixClass(string $className): string
     {
         return (Strings::startsWith($className, '\\')) ? $className : '\\' . $className;
+    }
+
+    private function getQualifiedClassName(string $propertyType): string
+    {
+        $metadata = $this->entityHydrator->getClassMetadata();
+        if (($qualifiedClass = $metadata->getQualifiedClassName($propertyType)) !== null) {
+            return $this->prefixClass($qualifiedClass);
+        }
+        return $propertyType;
     }
 }

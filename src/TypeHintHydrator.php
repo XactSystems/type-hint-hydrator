@@ -7,6 +7,7 @@ use JMS\Serializer\SerializerInterface;
 use Laminas\Hydrator\ReflectionHydrator;
 use ReflectionClass;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\Validator\ConstraintViolationList;
 use Symfony\Component\Validator\ConstraintViolationListInterface;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 use Xact\TypeHintHydrator\Converter\Converter;
@@ -16,45 +17,14 @@ class TypeHintHydrator
 {
     protected const JSON_FORMAT = 'json';
 
-    /**
-     * @var \Symfony\Component\Validator\Validator\ValidatorInterface
-     */
-    protected $validator;
-
-    /**
-     * @var \Doctrine\ORM\EntityManagerInterface
-     */
-    protected $em;
-
-    /**
-     * @var \JMS\Serializer\SerializerInterface
-     */
-    protected $serializer;
-
-    /**
-     * @var \Xact\TypeHintHydrator\ClassMetadata|null
-     */
-    protected $classMetadata = null;
-
-    /**
-     * @var \Symfony\Component\Validator\ConstraintViolationListInterface
-     */
-    protected $errors;
-
-    /**
-     * @var object|null
-     */
-    protected $currentTarget;
-
-    /**
-     * @var \ReflectionClass|null
-     */
-    protected $reflectionTarget;
-
-    /**
-     * @var \Xact\TypeHintHydrator\Converter\ConverterInterface
-     */
-    protected $typeConverter;
+    protected ValidatorInterface $validator;
+    protected EntityManagerInterface $em;
+    protected SerializerInterface $serializer;
+    protected ?ClassMetadata $classMetadata = null;
+    protected ConstraintViolationListInterface $errors;
+    protected ?object $currentTarget;
+    protected ?ReflectionClass $reflectionTarget;
+    protected ConverterInterface $typeConverter;
 
     public function __construct(ValidatorInterface $validator, EntityManagerInterface $em, SerializerInterface $serializer)
     {
@@ -62,6 +32,7 @@ class TypeHintHydrator
         $this->em = $em;
         $this->serializer = $serializer;
         $this->typeConverter = new Converter();
+        $this->errors = new ConstraintViolationList();
     }
 
     public function setConverter(ConverterInterface $converter): self
@@ -112,7 +83,9 @@ class TypeHintHydrator
 
         $hydratedObject = $hydrator->hydrate($values, $target);
 
-        $this->errors = $validate ? $this->validator->validate($hydratedObject, $constraints, $groups) : [];
+        if ($validate) {
+            $this->errors = $this->validator->validate($hydratedObject, $constraints, $groups);
+        }
 
         return $hydratedObject;
     }

@@ -9,10 +9,7 @@ use ReflectionProperty;
 
 class PropertyTypeHintStrategy implements StrategyInterface
 {
-    /**
-     * @var \Xact\TypeHintHydrator\PropertyConverter
-     */
-    protected $Converter;
+    protected PropertyConverter $Converter;
 
     public function __construct(ReflectionProperty $property, EntityManagerInterface $em, ReflectionClass $targetClass, TypeHintHydrator $hydrator, object $targetObject)
     {

@@ -6,25 +6,10 @@ namespace Xact\TypeHintHydrator;
 
 class PropertyMetadata
 {
-    /**
-     * @var string
-     */
-    public $name;
-
-    /**
-     * @var bool
-     */
-    public $exclude = false;
-
-    /**
-     * @var bool
-     */
-    public $skipFind = false;
-
-    /**
-     * @var bool
-     */
-    public $skipHydrate = false;
+    public string $name;
+    public bool $exclude = false;
+    public bool $skipFind = false;
+    public bool $skipHydrate = false;
 
     public function __construct(string $propertyName)
     {
