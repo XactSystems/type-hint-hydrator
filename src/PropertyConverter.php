@@ -124,13 +124,16 @@ class PropertyConverter
                         $subType = $this->getQualifiedClassName($matches[2]);
                         if (is_a($propertyType, Collection::class, true)) {
                             $this->targetProperty->setAccessible(true);
-                            /* @var Collection */
+                            /** @var Collection */
                             $convertedValue = $this->targetProperty->getValue($this->targetObject);
                             // Merge the hydrated children with the existing collection, deleting those that no longer exist.
                             $hydratedChildren = new ArrayCollection();
                             foreach ($value as $subItem) {
                                 $child = $this->convertToNativeTypeOrEntity($subItem, $subType);
-                                $convertedValue->add($child);
+                                if (!$convertedValue->contains($child)) {
+                                    // We only need to add it if it doesn't exist, convertToNativeTypeOrEntity above will hydrate any changes.
+                                    $convertedValue->add($child);
+                                }
                                 $hydratedChildren->add($child);
                             }
                             foreach ($convertedValue as $oldChild) {
@@ -178,7 +181,7 @@ class PropertyConverter
                  */
                 if (is_scalar($value) && !$this->propertyMetadata->skipFind) {
                     try {
-                        // If property type is an entity, and we have an array of values for it, try and load and hydrate that entity
+                        // If property type is an entity, try and load that entity
                         $this->em->getClassMetadata($propertyClass)->getSingleIdentifierFieldName();
                         return $this->em->getRepository($propertyClass)->find($value);
                     } catch (MappingException | PersistenceMappingException $e) {
