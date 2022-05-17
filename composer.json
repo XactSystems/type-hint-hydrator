@@ -28,8 +28,9 @@
         "jms/serializer-bundle": "^4.0",
         "laminas/laminas-hydrator": "^4.1",
         "nette/utils": "^3.1",
-        "symfony/validator": "^3.4||^4.4||^5.3",
-        "symfony/http-foundation": "^3.4||^4.4||^5.3"
+        "symfony/validator": "^3.4",
+        "symfony/http-foundation": "^3.4",
+        "symfony/doctrine-bridge": "^3.4"
     },
     "require-dev": {
         "symfony/debug-pack": "*",
