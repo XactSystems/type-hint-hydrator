@@ -4,7 +4,6 @@ namespace Xact\TypeHintHydrator;
 
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
-use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Mapping\MappingException;
 use Doctrine\Persistence\Mapping\MappingException as PersistenceMappingException;
 use Nette\Utils\Arrays;
@@ -16,7 +15,6 @@ use ReflectionUnionType;
 
 class PropertyConverter
 {
-    protected EntityManagerInterface $em;
     protected ReflectionClass $targetClass;
     protected ReflectionProperty $targetProperty;
     protected TypeHintHydrator $entityHydrator;
@@ -29,31 +27,24 @@ class PropertyConverter
     protected bool $isMixedArray = false;
     protected bool $isIterable = false;
 
-    /**
-     * @var string[]
-     */
+    /** @var string[] */
     protected array $allowedTypes;
 
-    /**
-     * @var string[]
-     */
+    /** @var string[] */
     protected array $allowedArrayTypes;
 
-    /**
-     * @var string[]
-     */
+    /** @var string[] */
     protected array $convertibleTypes = [];
 
+    /** @var string[] */
     protected array $ignoredDeclaredTypes = ['self', 'parent', 'callable', 'object'];
 
     public function __construct(
         ReflectionProperty $property,
-        EntityManagerInterface $em,
         ReflectionClass $targetClass,
         TypeHintHydrator $entityHydrator,
         object $targetObject
     ) {
-        $this->em = $em;
         $this->targetProperty = $property;
         $this->targetClass = $targetClass;
         $this->entityHydrator = $entityHydrator;
@@ -139,6 +130,10 @@ class PropertyConverter
                             foreach ($convertedValue as $oldChild) {
                                 if (!$hydratedChildren->contains($oldChild)) {
                                     $convertedValue->removeElement($oldChild);
+                                    $em = $this->entityHydrator->getEntityManagerForClass($subType);
+                                    if ($em !== null) {
+                                        $em->remove($oldChild);
+                                    }
                                 }
                             }
                         }
@@ -182,8 +177,11 @@ class PropertyConverter
                 if (is_scalar($value) && !$this->propertyMetadata->skipFind) {
                     try {
                         // If property type is an entity, try and load that entity
-                        $this->em->getClassMetadata($propertyClass)->getSingleIdentifierFieldName();
-                        return $this->em->getRepository($propertyClass)->find($value);
+                        $em = $this->entityHydrator->getEntityManagerForClass($propertyClass);
+                        if ($em !== null) {
+                            $em->getClassMetadata($propertyClass)->getSingleIdentifierFieldName();
+                            return $em->getRepository($propertyClass)->find($value);
+                        }
                     } catch (MappingException | PersistenceMappingException $e) {
                         // Ignore, it's either not an entity or the key does not exist
                     }
@@ -197,11 +195,14 @@ class PropertyConverter
                 if (is_array($value) && !$this->propertyMetadata->skipFind) {
                     try {
                         // If property type is an entity, and we have the ID field in the values list, try and find and hydrate that entity
-                        $idField = $this->em->getClassMetadata($type)->getSingleIdentifierFieldName();
-                        if (array_key_exists($idField, $value) && !empty($value[$idField])) {
-                            $entity = $this->em->getRepository($propertyClass)->find($value[$idField]);
-                            $this->entityHydrator->hydrateObject($value, $entity, false);
-                            return $entity;
+                        $em = $this->entityHydrator->getEntityManagerForClass($propertyClass);
+                        if ($em !== null) {
+                            $idField = $em->getClassMetadata($type)->getSingleIdentifierFieldName();
+                            if (array_key_exists($idField, $value) && !empty($value[$idField])) {
+                                $entity = $em->getRepository($propertyClass)->find($value[$idField]);
+                                $this->entityHydrator->hydrateObject($value, $entity, false);
+                                return $entity;
+                            }
                         }
                     } catch (MappingException $e) {
                         // Ignore, the class is not an entity, does not have an identity or the identifier is composite

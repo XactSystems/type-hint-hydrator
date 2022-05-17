@@ -5,7 +5,9 @@ namespace Xact\TypeHintHydrator;
 use Doctrine\ORM\EntityManagerInterface;
 use JMS\Serializer\SerializerInterface;
 use Laminas\Hydrator\ReflectionHydrator;
+use Nette\Utils\Strings;
 use ReflectionClass;
+use Symfony\Bridge\Doctrine\RegistryInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Validator\ConstraintViolationList;
 use Symfony\Component\Validator\ConstraintViolationListInterface;
@@ -18,7 +20,7 @@ class TypeHintHydrator
     protected const JSON_FORMAT = 'json';
 
     protected ValidatorInterface $validator;
-    protected EntityManagerInterface $em;
+    protected RegistryInterface $doctrineRegistry;
     protected SerializerInterface $serializer;
     protected ?ClassMetadata $classMetadata = null;
     protected ConstraintViolationListInterface $errors;
@@ -26,10 +28,10 @@ class TypeHintHydrator
     protected ?ReflectionClass $reflectionTarget;
     protected ConverterInterface $typeConverter;
 
-    public function __construct(ValidatorInterface $validator, EntityManagerInterface $em, SerializerInterface $serializer)
+    public function __construct(ValidatorInterface $validator, RegistryInterface $doctrineRegistry, SerializerInterface $serializer)
     {
         $this->validator = $validator;
-        $this->em = $em;
+        $this->doctrineRegistry = $doctrineRegistry;
         $this->serializer = $serializer;
         $this->typeConverter = new Converter();
         $this->errors = new ConstraintViolationList();
@@ -72,7 +74,7 @@ class TypeHintHydrator
             $propertyName = $property->getName();
             $propertyMetadata = $this->classMetadata->getPropertyMetadata($propertyName);
             if ($propertyMetadata === null || !$propertyMetadata->exclude) {
-                $strategies[$propertyName] = new PropertyTypeHintStrategy($property, $this->em, $this->reflectionTarget, $this, $target);
+                $strategies[$propertyName] = new PropertyTypeHintStrategy($property, $this->reflectionTarget, $this, $target);
             }
         }
 
@@ -122,6 +124,16 @@ class TypeHintHydrator
     public function getClassMetadata(): ?ClassMetadata
     {
         return $this->classMetadata;
+    }
+
+    public function getEntityManagerForClass(string $className): ?EntityManagerInterface
+    {
+        // Doctrine will not find a match if the class name is prefixed with a '\'. Oh the joy of consistency!
+        if (Strings::startsWith($className, '\\')) {
+            $className = Strings::substring($className, 1);
+        }
+
+        return $this->doctrineRegistry->getEntityManagerForClass($className);
     }
 
     /**

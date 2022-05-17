@@ -2,7 +2,6 @@
 
 namespace Xact\TypeHintHydrator;
 
-use Doctrine\ORM\EntityManagerInterface;
 use Laminas\Hydrator\Strategy\StrategyInterface;
 use ReflectionClass;
 use ReflectionProperty;
@@ -11,9 +10,9 @@ class PropertyTypeHintStrategy implements StrategyInterface
 {
     protected PropertyConverter $Converter;
 
-    public function __construct(ReflectionProperty $property, EntityManagerInterface $em, ReflectionClass $targetClass, TypeHintHydrator $hydrator, object $targetObject)
+    public function __construct(ReflectionProperty $property, ReflectionClass $targetClass, TypeHintHydrator $hydrator, object $targetObject)
     {
-        $this->Converter = new PropertyConverter($property, $em, $targetClass, $hydrator, $targetObject);
+        $this->Converter = new PropertyConverter($property, $targetClass, $hydrator, $targetObject);
     }
 
     /**
