@@ -2,7 +2,7 @@
     "name": "xactsystems/type-hint-hydrator",
     "description": "A Symfony object hydrator based on declared types and annotation type-hints.",
     "keywords": ["object", "hydrator", "array", "typed properties", "annotation", "symfony", "doctrine", "entity", "request"],
-    "version": "2.0.15",
+    "version": "2.0.16",
     "type": "symfony-bundle",
     "license": "MIT",
     "authors": [
@@ -28,17 +28,11 @@
         "jms/serializer-bundle": "^4.0",
         "laminas/laminas-hydrator": "^4.1",
         "nette/utils": "^3.1",
-        "symfony/validator": "^3.4||^4.4||^5.3",
-        "symfony/http-foundation": "^3.4||^4.4||^5.3"
+        "symfony/validator": "^4.4||^5.3",
+        "symfony/http-foundation": "^4.4||^5.3"
     },
     "require-dev": {
         "symfony/debug-pack": "*",
         "symfony/test-pack": "*"
-    },
-    "extra": {
-        "symfony": {
-            "allow-contrib": false,
-            "require": "3.4.*"
-        }
     }
 }
