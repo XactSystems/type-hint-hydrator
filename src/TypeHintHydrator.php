@@ -27,6 +27,8 @@ class TypeHintHydrator
     protected ?object $currentTarget;
     protected ?ReflectionClass $reflectionTarget;
     protected ConverterInterface $typeConverter;
+    /** @var array<string,ClassMetadata> */
+    protected $metadataCache = [];
 
     public function __construct(ValidatorInterface $validator, RegistryInterface $doctrineRegistry, SerializerInterface $serializer)
     {
@@ -60,6 +62,7 @@ class TypeHintHydrator
         $this->currentTarget = $target;
         $this->reflectionTarget = new ReflectionClass($target);
         $this->classMetadata = (new AnnotationHandler())->loadMetadataForClass($this->reflectionTarget);
+        $this->metadataCache[$this->reflectionTarget->getName()] = $this->classMetadata;
 
         if ($this->classMetadata->exclude) {
             return $target;
@@ -121,9 +124,10 @@ class TypeHintHydrator
         return $this->em;
     }
 
-    public function getClassMetadata(): ?ClassMetadata
+    public function getClassMetadata(string $className): ?ClassMetadata
     {
-        return $this->classMetadata;
+        $this->addMetadataCacheClass($className);
+        return $this->metadataCache[$className] ?? null;
     }
 
     public function getEntityManagerForClass(string $className): ?EntityManagerInterface
@@ -150,5 +154,12 @@ class TypeHintHydrator
         }
 
         return null;
+    }
+
+    protected function addMetadataCacheClass(string $className): void
+    {
+        if (class_exists($className) && !array_key_exists($className, $this->metadataCache)) {
+            $this->metadataCache[$className] = (new AnnotationHandler())->loadMetadataForClass(new ReflectionClass($className));
+        }
     }
 }

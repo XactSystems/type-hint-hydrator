@@ -265,7 +265,7 @@ class PropertyConverter
             $this->hasDefaultValue = $property->hasDefaultValue();
         }
 
-        $classMetadata = $this->entityHydrator->getClassMetadata();
+        $classMetadata = $this->entityHydrator->getClassMetadata($this->targetClass->getName());
         $this->propertyMetadata = $classMetadata->getPropertyMetadata($this->propertyName);
     }
 
@@ -390,7 +390,7 @@ class PropertyConverter
 
     private function getQualifiedClassName(string $propertyType): string
     {
-        $metadata = $this->entityHydrator->getClassMetadata();
+        $metadata = $this->entityHydrator->getClassMetadata($this->targetClass->getName());
         if (($qualifiedClass = $metadata->getQualifiedClassName($propertyType)) !== null) {
             return $this->prefixClass($qualifiedClass);
         }
