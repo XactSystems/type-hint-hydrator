@@ -90,10 +90,10 @@ class PropertyConverter
              * to convert each element to type.
              */
             if (is_array($value) && Strings::endsWith($type, '[]')) {
-                $realType = Strings::before($type, '[]');
+                $propertyType = $this->getQualifiedClassName(Strings::before($type, '[]'));
                 $convertedValue = [];
                 foreach ($value as $subItem) {
-                    $convertedValue[] = $this->convertToNativeTypeOrEntity($subItem, $realType);
+                    $convertedValue[] = $this->convertToNativeTypeOrEntity($subItem, $propertyType);
                 }
             }
 
