@@ -6,6 +6,7 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping\MappingException;
 use Doctrine\Persistence\Mapping\MappingException as PersistenceMappingException;
+use InvalidArgumentException;
 use Nette\Utils\Arrays;
 use Nette\Utils\Strings;
 use ReflectionClass;
@@ -68,9 +69,17 @@ class PropertyConverter
 
         /**
          * If the value is empty and this property is nullable, return null.
+         * If it's not nullable and empty, throw an error. Empty strings are handled above.
          */
-        if (($value === null || $value === '') && $this->isNullable) {
-            return null;
+        if ($value === null || $value === '') {
+            if ($this->isNullable) {
+                return null;
+            } else {
+                throw new InvalidArgumentException(
+                    "An error occurred hydrating an object of type {$this->targetCLass->getName()}. /
+                    Property {$this->propertyName} is not nullable and '{$value}' was given."
+                );
+            }
         }
 
         foreach ($this->allowedTypes as $type) {
@@ -81,10 +90,10 @@ class PropertyConverter
              * to convert each element to type.
              */
             if (is_array($value) && Strings::endsWith($type, '[]')) {
-                $realType = Strings::before($type, '[]');
+                $propertyType = $this->getQualifiedClassName(Strings::before($type, '[]'));
                 $convertedValue = [];
                 foreach ($value as $subItem) {
-                    $convertedValue[] = $this->convertToNativeTypeOrEntity($subItem, $realType);
+                    $convertedValue[] = $this->convertToNativeTypeOrEntity($subItem, $propertyType);
                 }
             }
 
@@ -265,7 +274,7 @@ class PropertyConverter
             $this->hasDefaultValue = $property->hasDefaultValue();
         }
 
-        $classMetadata = $this->entityHydrator->getClassMetadata();
+        $classMetadata = $this->entityHydrator->getClassMetadata($this->targetClass->getName());
         $this->propertyMetadata = $classMetadata->getPropertyMetadata($this->propertyName);
     }
 
@@ -390,7 +399,7 @@ class PropertyConverter
 
     private function getQualifiedClassName(string $propertyType): string
     {
-        $metadata = $this->entityHydrator->getClassMetadata();
+        $metadata = $this->entityHydrator->getClassMetadata($this->targetClass->getName());
         if (($qualifiedClass = $metadata->getQualifiedClassName($propertyType)) !== null) {
             return $this->prefixClass($qualifiedClass);
         }
