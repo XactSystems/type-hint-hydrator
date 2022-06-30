@@ -76,7 +76,7 @@ class PropertyConverter
                 return null;
             } else {
                 throw new InvalidArgumentException(
-                    "An error occurred hydrating an object of type {$this->targetCLass->getName()}. /
+                    "An error occurred hydrating an object of type {$this->targetClass->getName()}. /
                     Property {$this->propertyName} is not nullable and '{$value}' was given."
                 );
             }
