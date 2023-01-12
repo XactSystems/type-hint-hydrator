@@ -27,6 +27,7 @@ class PropertyConverter
     protected bool $isMixed = false;
     protected bool $isMixedArray = false;
     protected bool $isIterable = false;
+    protected ?PropertyMetadata $propertyMetadata = null;
 
     /** @var string[] */
     protected array $allowedTypes;
@@ -139,7 +140,7 @@ class PropertyConverter
                             foreach ($convertedValue as $oldChild) {
                                 if (!$hydratedChildren->contains($oldChild)) {
                                     $convertedValue->removeElement($oldChild);
-                                    $em = $this->entityHydrator->getEntityManagerForClass($subType);
+                                    $em = $this->entityHydrator->getManagerForClass($subType);
                                     if ($em !== null) {
                                         $em->remove($oldChild);
                                     }
@@ -186,7 +187,7 @@ class PropertyConverter
                 if (is_scalar($value) && !$this->propertyMetadata->skipFind) {
                     try {
                         // If property type is an entity, try and load that entity
-                        $em = $this->entityHydrator->getEntityManagerForClass($propertyClass);
+                        $em = $this->entityHydrator->getManagerForClass($propertyClass);
                         if ($em !== null) {
                             $em->getClassMetadata($propertyClass)->getSingleIdentifierFieldName();
                             return $em->getRepository($propertyClass)->find($value);
@@ -204,7 +205,7 @@ class PropertyConverter
                 if (is_array($value) && !$this->propertyMetadata->skipFind) {
                     try {
                         // If property type is an entity, and we have the ID field in the values list, try and find and hydrate that entity
-                        $em = $this->entityHydrator->getEntityManagerForClass($propertyClass);
+                        $em = $this->entityHydrator->getManagerForClass($propertyClass);
                         if ($em !== null) {
                             $idField = $em->getClassMetadata($type)->getSingleIdentifierFieldName();
                             if (array_key_exists($idField, $value) && !empty($value[$idField])) {

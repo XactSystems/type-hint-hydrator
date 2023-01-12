@@ -119,25 +119,30 @@ class TypeHintHydrator
         return $this->serializer->serialize($this->errors, self::JSON_FORMAT);
     }
 
-    public function getEntityManager(): EntityManagerInterface
-    {
-        return $this->em;
-    }
-
     public function getClassMetadata(string $className): ?ClassMetadata
     {
         $this->addMetadataCacheClass($className);
         return $this->metadataCache[$className] ?? null;
     }
 
-    public function getEntityManagerForClass(string $className): ?EntityManagerInterface
+    public function getManagerForClass(string $className): ?EntityManagerInterface
     {
         // Doctrine will not find a match if the class name is prefixed with a '\'. Oh the joy of consistency!
         if (Strings::startsWith($className, '\\')) {
             $className = Strings::substring($className, 1);
         }
 
-        return $this->doctrineRegistry->getEntityManagerForClass($className);
+        return $this->doctrineRegistry->getManagerForClass($className);
+    }
+
+    /**
+     * TODO - Remove this in the next major release (4.0)
+     *
+     * @deprecated Depreciated since 3.4.5 and will be removed in 4.0. Use getManagerForClass() instead.
+     */
+    public function getEntityManagerForClass(string $className): ?EntityManagerInterface
+    {
+        return $this->getManagerForClass($className);
     }
 
     /**
