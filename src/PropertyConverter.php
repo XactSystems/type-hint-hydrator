@@ -139,9 +139,9 @@ class PropertyConverter
                             foreach ($convertedValue as $oldChild) {
                                 if (!$hydratedChildren->contains($oldChild)) {
                                     $convertedValue->removeElement($oldChild);
-                                    $em = $this->entityHydrator->getEntityManagerForClass($subType);
-                                    if ($em !== null) {
-                                        $em->remove($oldChild);
+                                    $om = $this->entityHydrator->getManagerForClass($subType);
+                                    if ($om !== null) {
+                                        $om->remove($oldChild);
                                     }
                                 }
                             }
@@ -186,10 +186,10 @@ class PropertyConverter
                 if (is_scalar($value) && !$this->propertyMetadata->skipFind) {
                     try {
                         // If property type is an entity, try and load that entity
-                        $em = $this->entityHydrator->getEntityManagerForClass($propertyClass);
-                        if ($em !== null) {
-                            $em->getClassMetadata($propertyClass)->getSingleIdentifierFieldName();
-                            return $em->getRepository($propertyClass)->find($value);
+                        $om = $this->entityHydrator->getManagerForClass($propertyClass);
+                        if ($om !== null) {
+                            $om->getClassMetadata($propertyClass)->getSingleIdentifierFieldName();
+                            return $om->getRepository($propertyClass)->find($value);
                         }
                     } catch (MappingException | PersistenceMappingException $e) {
                         // Ignore, it's either not an entity or the key does not exist
@@ -204,11 +204,11 @@ class PropertyConverter
                 if (is_array($value) && !$this->propertyMetadata->skipFind) {
                     try {
                         // If property type is an entity, and we have the ID field in the values list, try and find and hydrate that entity
-                        $em = $this->entityHydrator->getEntityManagerForClass($propertyClass);
-                        if ($em !== null) {
-                            $idField = $em->getClassMetadata($type)->getSingleIdentifierFieldName();
+                        $om = $this->entityHydrator->getManagerForClass($propertyClass);
+                        if ($om !== null) {
+                            $idField = $om->getClassMetadata($type)->getSingleIdentifierFieldName();
                             if (array_key_exists($idField, $value) && !empty($value[$idField])) {
-                                $entity = $em->getRepository($propertyClass)->find($value[$idField]);
+                                $entity = $om->getRepository($propertyClass)->find($value[$idField]);
                                 $this->entityHydrator->hydrateObject($value, $entity, false);
                                 return $entity;
                             }

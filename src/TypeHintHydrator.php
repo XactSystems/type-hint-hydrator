@@ -3,11 +3,12 @@
 namespace Xact\TypeHintHydrator;
 
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\Persistence\ManagerRegistry;
+use Doctrine\Persistence\ObjectManager;
 use JMS\Serializer\SerializerInterface;
 use Laminas\Hydrator\ReflectionHydrator;
 use Nette\Utils\Strings;
 use ReflectionClass;
-use Symfony\Bridge\Doctrine\RegistryInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Validator\ConstraintViolationList;
 use Symfony\Component\Validator\ConstraintViolationListInterface;
@@ -20,7 +21,7 @@ class TypeHintHydrator
     protected const JSON_FORMAT = 'json';
 
     protected ValidatorInterface $validator;
-    protected RegistryInterface $doctrineRegistry;
+    protected ManagerRegistry $doctrineRegistry;
     protected SerializerInterface $serializer;
     protected ?ClassMetadata $classMetadata = null;
     protected ConstraintViolationListInterface $errors;
@@ -30,7 +31,7 @@ class TypeHintHydrator
     /** @var array<string,ClassMetadata> */
     protected $metadataCache = [];
 
-    public function __construct(ValidatorInterface $validator, RegistryInterface $doctrineRegistry, SerializerInterface $serializer)
+    public function __construct(ValidatorInterface $validator, ManagerRegistry $doctrineRegistry, SerializerInterface $serializer)
     {
         $this->validator = $validator;
         $this->doctrineRegistry = $doctrineRegistry;
@@ -130,14 +131,14 @@ class TypeHintHydrator
         return $this->metadataCache[$className] ?? null;
     }
 
-    public function getEntityManagerForClass(string $className): ?EntityManagerInterface
+    public function getManagerForClass(string $className): ?ObjectManager
     {
         // Doctrine will not find a match if the class name is prefixed with a '\'. Oh the joy of consistency!
         if (Strings::startsWith($className, '\\')) {
             $className = Strings::substring($className, 1);
         }
 
-        return $this->doctrineRegistry->getEntityManagerForClass($className);
+        return $this->doctrineRegistry->getManagerForClass($className);
     }
 
     /**
