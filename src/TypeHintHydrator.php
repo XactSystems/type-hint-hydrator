@@ -2,7 +2,6 @@
 
 namespace Xact\TypeHintHydrator;
 
-use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
 use Doctrine\Persistence\ObjectManager;
 use JMS\Serializer\SerializerInterface;
@@ -118,11 +117,6 @@ class TypeHintHydrator
     public function getJsonErrors(): string
     {
         return $this->serializer->serialize($this->errors, self::JSON_FORMAT);
-    }
-
-    public function getEntityManager(): EntityManagerInterface
-    {
-        return $this->em;
     }
 
     public function getClassMetadata(string $className): ?ClassMetadata
