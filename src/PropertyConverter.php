@@ -118,8 +118,8 @@ class PropertyConverter
                         $convertedValue->add($itemValue);
                     }
                 } else {
-                    // Try and match Doctrine\Common\Collections\Collection<App\MyEntity>
-                    $matches = Strings::match($type, '/(.*)(?:<)(.*)(?:>)/');
+                    // Try and match Doctrine\Common\Collections\Collection<App\MyEntity> or Doctrine\Common\Collections\Collection<key, App\MyEntity>
+                    $matches = Strings::match($type, '/(.*)(?:<)(?:\w+,\s*)?(.*)(?:>)/');
                     if ($matches !== null) {
                         $propertyType = $this->getQualifiedClassName($matches[1]);
                         $subType = $this->getQualifiedClassName($matches[2]);
@@ -250,7 +250,7 @@ class PropertyConverter
         }
 
         // If the @var annotation exists, append those types. For iterable types we use the @var definition for the array type.
-        $matches = Strings::match($property->getDocComment(), '/@var ((?:(?:[\w?|\\\\<>])+(?:\[])?)+)/');
+        $matches = Strings::match($property->getDocComment(), '/@var ((?:(?:[\w?|\\\\<>, ])+(?:\[])?)+)/');
         $varTypes = is_array($matches) ? $matches[1] : '';
         if ($varTypes) {
             $this->hasTypeHint = true;
