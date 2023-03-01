@@ -250,17 +250,17 @@ class PropertyConverter
         }
 
         // If the @var annotation exists, append those types. For iterable types we use the @var definition for the array type.
-        $matches = Strings::match($property->getDocComment(), '/@var ((?:(?:[\w?|\\\\<>, ])+(?:\[])?)+)/');
+        $matches = Strings::match($property->getDocComment(), '/@var ((?:(?:[\w|\\\\]+(?:<(?:\w+,\s*)?[\w|\\\\]+>)?))(?:\[])?)/');
         $varTypes = is_array($matches) ? $matches[1] : '';
         if ($varTypes) {
             $this->hasTypeHint = true;
 
             // If we have an iterable declared type, use the type hint to suggest the array type
             if ($this->resolveIsIterable($definition)) {
-                $definition = trim($varTypes);
+                $definition = $varTypes;
             } else {
                 // Otherwise the declared type takes precedence
-                $definition = trim($definition .= ($definition ? '|' : '') . $varTypes);
+                $definition = $definition .= ($definition ? '|' : '') . $varTypes;
             }
         }
 
@@ -306,7 +306,7 @@ class PropertyConverter
             $resolvedType = $typeName . ($type->allowsNull() ? '|null' : '');
         }
 
-        return trim($resolvedType);
+        return $resolvedType;
     }
 
     private function resolveNullable(string $definition): bool
@@ -395,7 +395,7 @@ class PropertyConverter
 
     private function prefixClass(string $className): string
     {
-        return trim((Strings::startsWith($className, '\\')) ? $className : '\\' . $className);
+        return (Strings::startsWith($className, '\\')) ? $className : '\\' . $className;
     }
 
     private function getQualifiedClassName(string $propertyType): string
