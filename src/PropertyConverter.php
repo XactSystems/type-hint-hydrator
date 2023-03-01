@@ -257,10 +257,10 @@ class PropertyConverter
 
             // If we have an iterable declared type, use the type hint to suggest the array type
             if ($this->resolveIsIterable($definition)) {
-                $definition = $varTypes;
+                $definition = trim($varTypes);
             } else {
                 // Otherwise the declared type takes precedence
-                $definition .= ($definition ? '|' : '') . $varTypes;
+                $definition = trim($definition .= ($definition ? '|' : '') . $varTypes);
             }
         }
 
@@ -306,7 +306,7 @@ class PropertyConverter
             $resolvedType = $typeName . ($type->allowsNull() ? '|null' : '');
         }
 
-        return $resolvedType;
+        return trim($resolvedType);
     }
 
     private function resolveNullable(string $definition): bool
@@ -395,7 +395,7 @@ class PropertyConverter
 
     private function prefixClass(string $className): string
     {
-        return (Strings::startsWith($className, '\\')) ? $className : '\\' . $className;
+        return trim((Strings::startsWith($className, '\\')) ? $className : '\\' . $className);
     }
 
     private function getQualifiedClassName(string $propertyType): string
