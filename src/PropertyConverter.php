@@ -250,7 +250,7 @@ class PropertyConverter
         }
 
         // If the @var annotation exists, append those types. For iterable types we use the @var definition for the array type.
-        $matches = Strings::match($property->getDocComment(), '/@var ((?:(?:[\w?|\\\\<>, ])+(?:\[])?)+)/');
+        $matches = Strings::match($property->getDocComment(), '/@var ((?:(?:[\w|\\\\]+(?:<(?:\w+,\s*)?[\w|\\\\]+>)?))(?:\[])?)/');
         $varTypes = is_array($matches) ? $matches[1] : '';
         if ($varTypes) {
             $this->hasTypeHint = true;
