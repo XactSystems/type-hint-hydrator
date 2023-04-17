@@ -34,7 +34,10 @@ class AnnotationHandler
         }
 
         foreach ($class->getProperties() as $property) {
-            if ($property->class !== $className || (isset($property->info) && $property->info['class'] !== $className)) {
+            if (
+                ($property->class !== $className && !is_subclass_of($className, $property->class)) ||
+                (isset($property->info) && $property->info['class'] !== $className)
+            ) {
                 continue;
             }
 
