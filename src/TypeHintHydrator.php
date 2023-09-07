@@ -2,6 +2,7 @@
 
 namespace Xact\TypeHintHydrator;
 
+use Doctrine\Common\Util\ClassUtils;
 use Doctrine\Persistence\ManagerRegistry;
 use Doctrine\Persistence\ObjectManager;
 use JMS\Serializer\SerializerInterface;
@@ -59,8 +60,9 @@ class TypeHintHydrator
      */
     public function hydrateObject(array $values, object $target, bool $validate = true, $constraints = null, $groups = null): object
     {
+        $realClass = ClassUtils::getRealClass(get_class($target));
         $this->currentTarget = $target;
-        $this->reflectionTarget = new ReflectionClass($target);
+        $this->reflectionTarget = new ReflectionClass($realClass);
         $this->classMetadata = (new AnnotationHandler())->loadMetadataForClass($this->reflectionTarget);
         $this->metadataCache[$this->reflectionTarget->getName()] = $this->classMetadata;
 
