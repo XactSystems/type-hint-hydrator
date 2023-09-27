@@ -3,10 +3,9 @@
 namespace Xact\TypeHintHydrator;
 
 use Doctrine\Common\Util\ClassUtils;
+use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
-use Doctrine\Persistence\ObjectManager;
 use JMS\Serializer\SerializerInterface;
-use Laminas\Hydrator\ReflectionHydrator;
 use Nette\Utils\Strings;
 use ReflectionClass;
 use Symfony\Component\HttpFoundation\Request;
@@ -60,9 +59,8 @@ class TypeHintHydrator
      */
     public function hydrateObject(array $values, object $target, bool $validate = true, $constraints = null, $groups = null): object
     {
-        $realClass = ClassUtils::getRealClass(get_class($target));
         $this->currentTarget = $target;
-        $this->reflectionTarget = new ReflectionClass($realClass);
+        $this->reflectionTarget = ClassUtils::newReflectionObject($target);
         $this->classMetadata = (new AnnotationHandler())->loadMetadataForClass($this->reflectionTarget);
         $this->metadataCache[$this->reflectionTarget->getName()] = $this->classMetadata;
 
@@ -127,7 +125,7 @@ class TypeHintHydrator
         return $this->metadataCache[$className] ?? null;
     }
 
-    public function getManagerForClass(string $className): ?ObjectManager
+    public function getManagerForClass(string $className): ?EntityManagerInterface
     {
         // Doctrine will not find a match if the class name is prefixed with a '\'. Oh the joy of consistency!
         if (Strings::startsWith($className, '\\')) {

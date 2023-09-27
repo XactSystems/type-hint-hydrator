@@ -190,7 +190,9 @@ class PropertyConverter
                         $om = $this->entityHydrator->getManagerForClass($propertyClass);
                         if ($om !== null) {
                             $om->getClassMetadata($propertyClass)->getSingleIdentifierFieldName();
-                            return $om->getRepository($propertyClass)->find($value);
+                            $entity = $om->find($propertyClass, $value);
+                            $om->initializeObject($entity); // Required for proxied entities.
+                            return $entity;
                         }
                     } catch (MappingException | PersistenceMappingException $e) {
                         // Ignore, it's either not an entity or the key does not exist
@@ -209,7 +211,8 @@ class PropertyConverter
                         if ($om !== null) {
                             $idField = $om->getClassMetadata($type)->getSingleIdentifierFieldName();
                             if (array_key_exists($idField, $value) && !empty($value[$idField])) {
-                                $entity = $om->getRepository($propertyClass)->find($value[$idField]);
+                                $entity = $om->find($propertyClass, $value[$idField]);
+                                $om->initializeObject($entity); // Required for proxied entities.
                                 $this->entityHydrator->hydrateObject($value, $entity, false);
                                 return $entity;
                             }
