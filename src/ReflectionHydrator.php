@@ -4,23 +4,31 @@ declare(strict_types=1);
 
 namespace Xact\TypeHintHydrator;
 
-use Doctrine\Common\Proxy\Proxy;
-use Laminas\Hydrator\ReflectionHydrator as LaminasReflectionHydrator;
+use Laminas\Hydrator\AbstractHydrator;
 use ReflectionClass;
 use ReflectionProperty;
 
-class ReflectionHydrator extends LaminasReflectionHydrator
+/**
+ * TODO: Remove this class when the base hydrator issue 114 is resolved. https://github.com/laminas/laminas-hydrator/issues/114
+ */
+class ReflectionHydrator extends AbstractHydrator
 {
     /**
+     * Simple in-memory array cache of ReflectionProperties used.
+     *
+     * @var ReflectionProperty[][]
+     */
+    protected static $reflProperties = [];
+
+    /**
      * Extract values from an object
-     * TODO: Remove this method when issue 113 is resolved: https://github.com/laminas/laminas-hydrator/issues/113
      *
      * {@inheritDoc}
      */
-    public function extract(object $object): array
+    public function extract(object $object, bool $includeParentProperties = false): array
     {
         $result = [];
-        foreach (static::getReflProperties($object) as $property) {
+        foreach (static::getReflProperties($object, $includeParentProperties) as $property) {
             $propertyName = $this->extractName($property->getName(), $object);
             if (! $this->getCompositeFilter()->filter($propertyName)) {
                 continue;
@@ -35,13 +43,12 @@ class ReflectionHydrator extends LaminasReflectionHydrator
 
     /**
      * Hydrate $object with the provided $data.
-     * TODO: Remove this method when issue 113 is resolved: https://github.com/laminas/laminas-hydrator/issues/113
      *
      * {@inheritDoc}
      */
-    public function hydrate(array $data, object $object)
+    public function hydrate(array $data, object $object, bool $includeParentProperties = false)
     {
-        $reflProperties = static::getReflProperties($object);
+        $reflProperties = static::getReflProperties($object, $includeParentProperties);
         foreach ($data as $key => $value) {
             $name = $this->hydrateName($key, $data);
             if (isset($reflProperties[$name])) {
@@ -53,26 +60,27 @@ class ReflectionHydrator extends LaminasReflectionHydrator
 
     /**
      * Get a reflection properties for an object.
-     * If that object is a Doctrine proxy, return the base entity class properties.
+     * If $includeParentProperties is true, return return all parent properties as well.
      *
      * @return ReflectionProperty[]
      */
-    protected static function getReflProperties(object $input): array
+    protected static function getReflProperties(object $input, bool $includeParentProperties): array
     {
-        $class = $input instanceof Proxy ? get_parent_class($input) : get_class($input);
+        $class = get_class($input);
 
         if (isset(static::$reflProperties[$class])) {
             return static::$reflProperties[$class];
         }
 
         static::$reflProperties[$class] = [];
-        $reflClass                      = new ReflectionClass($class);
-        $reflProperties                 = $reflClass->getProperties();
+        $reflClass = new ReflectionClass($class);
 
-        foreach ($reflProperties as $property) {
-            $property->setAccessible(true);
-            static::$reflProperties[$class][$property->getName()] = $property;
-        }
+        do {
+            foreach ($reflClass->getProperties() as $property) {
+                $property->setAccessible(true);
+                static::$reflProperties[$class][$property->getName()] = $property;
+            }
+        } while ($includeParentProperties === true && ($reflClass = $reflClass->getParentClass()) !== false);
 
         return static::$reflProperties[$class];
     }

@@ -86,7 +86,7 @@ class TypeHintHydrator
             $hydrator->addStrategy($key, $strategy);
         }
 
-        $hydratedObject = $hydrator->hydrate($values, $target);
+        $hydratedObject = $hydrator->hydrate($values, $target, true);
 
         if ($validate) {
             $this->errors = $this->validator->validate($hydratedObject, $constraints, $groups);
