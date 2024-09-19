@@ -31,7 +31,21 @@
         "symfony/http-foundation": "^6.2||7.1"
     },
     "require-dev": {
+        "phpstan/extension-installer": "^1.4",
+        "phpstan/phpdoc-parser": "^1.29",
+        "phpstan/phpstan": "^1.11",
+        "phpstan/phpstan-deprecation-rules": "^1.2",
+        "phpstan/phpstan-doctrine": "^1.5",
+        "phpstan/phpstan-symfony": "^1.4",
+        "slevomat/coding-standard": "^8.15",
+        "squizlabs/php_codesniffer": "^3.10",
         "symfony/debug-pack": "*",
         "symfony/test-pack": "*"
+    },
+    "config": {
+        "allow-plugins": {
+            "phpstan/extension-installer": true,
+            "dealerdirect/phpcodesniffer-composer-installer": true
+        }
     }
 }

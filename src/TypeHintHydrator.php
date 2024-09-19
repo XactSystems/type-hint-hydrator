@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Xact\TypeHintHydrator;
 
 use Doctrine\ORM\EntityManagerInterface;
@@ -29,8 +31,8 @@ class TypeHintHydrator
     protected ?object $currentTarget;
     protected ?ReflectionClass $reflectionTarget;
     protected ConverterInterface $typeConverter;
-    /** @var array<string,ClassMetadata> */
-    protected $metadataCache = [];
+    /** @var array<string, ClassMetadata> */
+    protected array $metadataCache = [];
 
     public function __construct(ValidatorInterface $validator, ManagerRegistry $doctrineRegistry, SerializerInterface $serializer)
     {
@@ -56,7 +58,6 @@ class TypeHintHydrator
      * @param mixed[] $values
      * @param Constraint|Constraint[] $constraints  The constraint(s) to validate against
      * @param string|GroupSequence|(string|GroupSequence)[]|null $groups  The validation groups to validate. If none is given, "Default" is assumed
-     *
      * @throws \Laminas\Hydrator\Exception\InvalidArgumentException
      */
     public function hydrateObject(
@@ -149,7 +150,6 @@ class TypeHintHydrator
 
     /**
      * @return mixed
-     *
      * @throws \ReflectionException
      */
     public function getOriginalValue(string $propertyName): ?ReflectionProperty
@@ -167,7 +167,11 @@ class TypeHintHydrator
     {
         // return a ReflectionClass object for the entity. If $target is a proxy, return it for the base entity.
         $proxyOrEntityClassName = get_class($object);
-        $entityClassName = $this->doctrineRegistry->getManagerForClass($proxyOrEntityClassName)->getClassMetadata($proxyOrEntityClassName)->getName();
+        $entityClassName = (
+            ($manager = $this->doctrineRegistry->getManagerForClass($proxyOrEntityClassName))
+                ? $manager->getClassMetadata($proxyOrEntityClassName)->getName()
+                : $proxyOrEntityClassName
+        );
         return new ReflectionClass($proxyOrEntityClassName === $entityClassName ? $object : get_parent_class($object));
     }
 

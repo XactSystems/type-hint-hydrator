@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Xact\TypeHintHydrator\Converter;
 
 interface ConverterInterface
@@ -14,7 +16,6 @@ interface ConverterInterface
      *
      * @param string $type The type to convert to, int, bool, float etc.
      * @param mixed $value The value to convert
-     * @return mixed
      */
-    public function convert(string $type, $value);
+    public function convert(string $type, mixed $value): mixed;
 }

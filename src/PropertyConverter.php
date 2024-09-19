@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Xact\TypeHintHydrator;
 
 use Doctrine\Common\Collections\ArrayCollection;
@@ -356,7 +358,7 @@ class PropertyConverter
     private function resolveAllowedArrayTypes(string $definition): array
     {
         return $this->normaliseTypes(...array_map(
-            function (string $type): ?string {
+            static function (string $type): ?string {
                 if (! $type) {
                     return null;
                 }
