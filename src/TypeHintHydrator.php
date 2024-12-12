@@ -104,16 +104,19 @@ class TypeHintHydrator
         return $this->hydrateObject($request->request->all(), $target, $validate, $constraints, $groups);
     }
 
+    /** @phpstan-impure */
     public function isValid(): bool
     {
         return (count($this->errors) === 0);
     }
 
+    /** @phpstan-impure */
     public function getErrors(): ConstraintViolationListInterface
     {
         return $this->errors;
     }
 
+    /** @phpstan-impure */
     public function getJsonErrors(): string
     {
         return $this->serializer->serialize($this->errors, self::JSON_FORMAT);
