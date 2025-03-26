@@ -60,7 +60,7 @@ class TypeHintHydrator
     public function hydrateObject(array $values, object $target, bool $validate = true, $constraints = null, $groups = null): object
     {
         $this->currentTarget = $target;
-        $this->reflectionTarget = new ReflectionClass($target);
+        $this->reflectionTarget = $this->getReflectionTarget($target);
         $this->classMetadata = (new AnnotationHandler())->loadMetadataForClass($this->reflectionTarget);
         $this->metadataCache[$this->reflectionTarget->getName()] = $this->classMetadata;
 
@@ -162,6 +162,15 @@ class TypeHintHydrator
         }
 
         return null;
+    }
+
+    protected function getReflectionTarget(object $object): ReflectionClass
+    {
+        // return a ReflectionClass object for the entity. If $target is a proxy, return it for the base entity.
+        $proxyOrEntityClassName = get_class($object);
+        $entityManager = $this->doctrineRegistry->getManagerForClass($proxyOrEntityClassName);
+        $entityClassName = $entityManager ? $entityManager->getClassMetadata($proxyOrEntityClassName)->getName() : $proxyOrEntityClassName;
+        return new ReflectionClass($proxyOrEntityClassName === $entityClassName ? $object : get_parent_class($object));
     }
 
     protected function addMetadataCacheClass(string $className): void
