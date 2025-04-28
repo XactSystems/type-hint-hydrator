@@ -5,14 +5,12 @@ namespace Xact\TypeHintHydrator;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping\MappingException;
-use Doctrine\Persistence\Mapping\MappingException as PersistenceMappingException;
 use InvalidArgumentException;
 use Nette\Utils\Arrays;
 use Nette\Utils\Strings;
 use ReflectionClass;
 use ReflectionNamedType;
 use ReflectionProperty;
-use ReflectionUnionType;
 
 class PropertyConverter
 {
@@ -174,7 +172,7 @@ class PropertyConverter
         do {
             $converter = $this->entityHydrator->getConverter();
             if ($converter->canConvert($type)) {
-                return $converter->convert($type, $value);
+                return $converter->convert($type, $value, $this->targetProperty, $this->targetObject);
             }
 
             // If it's a class, see if it's an entity, or instantiate it, and hydrate it
@@ -192,7 +190,7 @@ class PropertyConverter
                             $em->getClassMetadata($propertyClass)->getSingleIdentifierFieldName();
                             return $em->getRepository($propertyClass)->find($value);
                         }
-                    } catch (MappingException | PersistenceMappingException $e) {
+                    } catch (MappingException $e) {
                         // Ignore, it's either not an entity or the key does not exist
                     }
                 }
@@ -215,8 +213,6 @@ class PropertyConverter
                             }
                         }
                     } catch (MappingException $e) {
-                        // Ignore, the class is not an entity, does not have an identity or the identifier is composite
-                    } catch (PersistenceMappingException $e) {
                     }
 
                     /**
@@ -285,13 +281,6 @@ class PropertyConverter
         switch (get_class($reflectionType)) {
             case ReflectionNamedType::class:
                 return $this->resolveTypedProperty($reflectionType);
-            case ReflectionUnionType::class:
-            case ReflectionIntersectionType::class:
-                $types = '';
-                foreach ($reflectionType->getTypes() as $type) {
-                    $type .= ($types ? '|' : '') . $this->resolveTypedProperty($type);
-                }
-                return $types;
         }
 
         return '';

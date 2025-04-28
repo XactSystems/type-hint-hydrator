@@ -2,6 +2,8 @@
 
 namespace Xact\TypeHintHydrator\Converter\Types;
 
+use ReflectionProperty;
+
 interface TypeConverterInterface
 {
     /**
@@ -10,5 +12,5 @@ interface TypeConverterInterface
      * @param mixed $value The value to convert
      * @return mixed
      */
-    public static function convert($value);
+    public static function convert($value, ReflectionProperty $property, object $targetObject);
 }

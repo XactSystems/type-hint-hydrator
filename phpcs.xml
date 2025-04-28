@@ -7,8 +7,8 @@
 
 	<exclude-pattern>vendor/*</exclude-pattern>
 
-    <!-- Check for cross-version support for PHP 7.3 and higher using PHPCompatibility. -->
-    <config name="testVersion" value="7.4-"/>
+    <!-- Check for cross-version support for PHP 7.4 using PHPCompatibility. -->
+    <config name="php_version" value="70433"/>
     <rule ref="PHPCompatibility"/>
     
     <rule ref="PSR12">

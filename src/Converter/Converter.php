@@ -3,6 +3,7 @@
 namespace Xact\TypeHintHydrator\Converter;
 
 use InvalidArgumentException;
+use ReflectionProperty;
 use Xact\TypeHintHydrator\Converter\Types\BoolConverter;
 use Xact\TypeHintHydrator\Converter\Types\DateTimeConverter;
 use Xact\TypeHintHydrator\Converter\Types\FloatConverter;
@@ -34,7 +35,7 @@ class Converter implements ConverterInterface
     /**
      * @inheritDoc
      */
-    public function convert(string $type, $value)
+    public function convert(string $type, $value, ReflectionProperty $property, object $targetObject)
     {
         if (!$this->canConvert($type)) {
             $validTypes = array_keys($this->convertibleTypes);
@@ -49,6 +50,6 @@ class Converter implements ConverterInterface
         if (!in_array($interface, class_implements($converterClass))) {
             throw new InvalidArgumentException("The converter class '{$converterClass}' does not implement the {$interface} interface.");
         }
-        return $converterClass::convert($value);
+        return $converterClass::convert($value, $property, $targetObject);
     }
 }
