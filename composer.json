@@ -28,7 +28,8 @@
         "laminas/laminas-hydrator": "^4.15",
         "nette/utils": "4.0",
         "symfony/validator": "^6.2||7.1",
-        "symfony/http-foundation": "^6.2||7.1"
+        "symfony/http-foundation": "^6.2||7.1",
+        "doctrine/doctrine-laminas-hydrator": "^3.6"
     },
     "require-dev": {
         "phpstan/extension-installer": "^1.4",
