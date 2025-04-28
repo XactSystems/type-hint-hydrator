@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace Xact\TypeHintHydrator\Converter\Types;
 
+use ReflectionProperty;
+
 class FloatConverter implements TypeConverterInterface
 {
     /**
      * @inheritDoc
      */
-    public static function convert($value): float
+     // phpcs:ignore SlevomatCodingStandard.Functions.UnusedParameter.UnusedParameter
+    public static function convert($value, ReflectionProperty $property, object $targetObject): float
     {
         return floatval($value);
     }

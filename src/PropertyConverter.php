@@ -172,7 +172,7 @@ class PropertyConverter
         do {
             $converter = $this->entityHydrator->getConverter();
             if ($converter->canConvert($type)) {
-                return $converter->convert($type, $value);
+                return $converter->convert($type, $value, $this->targetProperty, $this->targetObject);
             }
 
             // If it's a class, see if it's an entity, or instantiate it, and hydrate it
