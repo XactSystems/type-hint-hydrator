@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Xact\TypeHintHydrator;
 
+use Doctrine\Laminas\Hydrator\DoctrineObject as DoctrineHydrator;
 use Doctrine\ORM\EntityManagerInterface;
 use JMS\Serializer\SerializerInterface;
 use Laminas\Hydrator\ReflectionHydrator;
@@ -62,7 +63,7 @@ class TypeHintHydrator
     public function hydrateObject(array $values, object $target, bool $validate = true, $constraints = null, $groups = null): object
     {
         $this->currentTarget = $target;
-        $this->reflectionTarget = $this->getReflectionTarget($target);
+        $this->reflectionTarget = new ReflectionClass($target);
         $this->classMetadata = (new AnnotationHandler())->loadMetadataForClass($this->reflectionTarget);
         $this->metadataCache[$this->reflectionTarget->getName()] = $this->classMetadata;
 
@@ -70,24 +71,24 @@ class TypeHintHydrator
             return $target;
         }
 
-        /**
-         * Build a list of strategies for each property in the target object.
-         */
-        $strategies = [];
+        $hydratedObject = $target;
+
+        // If the target object is a Doctrine entity, use the Doctrine hydrator. Otherwise use the Reflection hydrator
         $properties = $this->reflectionTarget->getProperties();
+        $entityManager = $this->getManagerForClass($this->reflectionTarget->getName());
+        $hydrator = (
+            $entityManager instanceof EntityManagerInterface ?
+                new DoctrineHydrator($entityManager, $this->reflectionTarget->getName()) :
+                new ReflectionHydrator()
+        );
         foreach ($properties as $property) {
             $propertyName = $property->getName();
             $propertyMetadata = $this->classMetadata->getPropertyMetadata($propertyName);
             if ($propertyMetadata === null || !$propertyMetadata->exclude) {
-                $strategies[$propertyName] = new PropertyTypeHintStrategy($property, $this->reflectionTarget, $this, $target);
+                $strategy = new PropertyTypeHintStrategy($property, $this->reflectionTarget, $this, $target);
+                $hydrator->addStrategy($propertyName, $strategy);
             }
         }
-
-        $hydrator = new ReflectionHydrator();
-        foreach ($strategies as $key => $strategy) {
-            $hydrator->addStrategy($key, $strategy);
-        }
-
         $hydratedObject = $hydrator->hydrate($values, $target);
 
         if ($validate) {
@@ -164,15 +165,6 @@ class TypeHintHydrator
         }
 
         return null;
-    }
-
-    protected function getReflectionTarget(object $object): ReflectionClass
-    {
-        // return a ReflectionClass object for the entity. If $target is a proxy, return it for the base entity.
-        $proxyOrEntityClassName = get_class($object);
-        $entityManager = $this->doctrineRegistry->getManagerForClass($proxyOrEntityClassName);
-        $entityClassName = $entityManager ? $entityManager->getClassMetadata($proxyOrEntityClassName)->getName() : $proxyOrEntityClassName;
-        return new ReflectionClass($proxyOrEntityClassName === $entityClassName ? $object : get_parent_class($object));
     }
 
     protected function addMetadataCacheClass(string $className): void
