@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Xact\TypeHintHydrator;
 
+use Doctrine\Common\Collections\Collection;
 use Doctrine\Laminas\Hydrator\DoctrineObject as DoctrineHydrator;
+use Doctrine\Laminas\Hydrator\Strategy\AllowRemoveByValue;
 use Doctrine\ORM\EntityManagerInterface;
 use JMS\Serializer\SerializerInterface;
 use Laminas\Hydrator\ReflectionHydrator;
@@ -76,17 +78,30 @@ class TypeHintHydrator
         // If the target object is a Doctrine entity, use the Doctrine hydrator. Otherwise use the Reflection hydrator
         $properties = $this->reflectionTarget->getProperties();
         $entityManager = $this->getManagerForClass($this->reflectionTarget->getName());
-        $hydrator = (
-            $entityManager instanceof EntityManagerInterface ?
-                new DoctrineHydrator($entityManager, $this->reflectionTarget->getName()) :
-                new ReflectionHydrator()
-        );
-        foreach ($properties as $property) {
-            $propertyName = $property->getName();
-            $propertyMetadata = $this->classMetadata->getPropertyMetadata($propertyName);
-            if ($propertyMetadata === null || !$propertyMetadata->exclude) {
-                $strategy = new PropertyTypeHintStrategy($property, $this->reflectionTarget, $this, $target);
-                $hydrator->addStrategy($propertyName, $strategy);
+        if ($entityManager instanceof EntityManagerInterface) {
+            $hydrator = new DoctrineHydrator($entityManager, $this->reflectionTarget->getName());
+            foreach ($properties as $property) {
+                $propertyName = $property->getName();
+                $propertyMetadata = $this->classMetadata->getPropertyMetadata($propertyName);
+                if ($propertyMetadata === null || !$propertyMetadata->exclude) {
+                    $property->setAccessible(true);
+                    $strategy = (
+                        $property->getValue($target) instanceof Collection ?
+                            new AllowRemoveByValue() :
+                            new PropertyTypeHintStrategy($property, $this->reflectionTarget, $this, $target)
+                    );
+                    $hydrator->addStrategy($propertyName, $strategy);
+                }
+            }
+        } else {
+            $hydrator = new ReflectionHydrator();
+            foreach ($properties as $property) {
+                $propertyName = $property->getName();
+                $propertyMetadata = $this->classMetadata->getPropertyMetadata($propertyName);
+                if ($propertyMetadata === null || !$propertyMetadata->exclude) {
+                    $strategy = new PropertyTypeHintStrategy($property, $this->reflectionTarget, $this, $target);
+                    $hydrator->addStrategy($propertyName, $strategy);
+                }
             }
         }
         $hydratedObject = $hydrator->hydrate($values, $target);
