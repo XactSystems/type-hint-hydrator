@@ -79,14 +79,14 @@ class TypeHintHydrator
         $properties = $this->reflectionTarget->getProperties();
         $entityManager = $this->getManagerForClass($this->reflectionTarget->getName());
         if ($entityManager instanceof EntityManagerInterface) {
-            $hydrator = new DoctrineHydrator($entityManager, $this->reflectionTarget->getName());
+            $hydrator = new DoctrineHydrator($entityManager);
             foreach ($properties as $property) {
                 $propertyName = $property->getName();
                 $propertyMetadata = $this->classMetadata->getPropertyMetadata($propertyName);
                 if ($propertyMetadata === null || !$propertyMetadata->exclude) {
                     $property->setAccessible(true);
                     $strategy = (
-                        $property->getValue($target) instanceof Collection ?
+                        $property->isInitialized($target) && $property->getValue($target) instanceof Collection ?
                             new AllowRemoveByValue() :
                             new PropertyTypeHintStrategy($property, $this->reflectionTarget, $this, $target)
                     );
