@@ -55,18 +55,16 @@ class ClassMetadata
      */
     public function getQualifiedClassName(string $class): ?string
     {
-        if (str_contains($class, '\\')) {
-            $loweredClass = strtolower($class);
-            if (array_key_exists($loweredClass, $this->useStatements)) {
-                return $this->useStatements[$loweredClass];
-            }
-            if (array_search($class, $this->useStatements) !== false) {
-                return $class;
-            }
-            $namespacedClass = "{$this->nameSpace}\\{$class}";
-            if (class_exists($namespacedClass, false)) {
-                return $namespacedClass;
-            }
+        $loweredClass = strtolower($class);
+        if (array_key_exists($loweredClass, $this->useStatements)) {
+            return $this->useStatements[$loweredClass];
+        }
+        if (array_search($class, $this->useStatements) !== false) {
+            return $class;
+        }
+        $namespacedClass = "{$this->nameSpace}\\{$class}";
+        if (class_exists($namespacedClass, false)) {
+            return $namespacedClass;
         }
         return null;
     }

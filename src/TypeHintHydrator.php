@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Xact\TypeHintHydrator;
 
+use Doctrine\Common\Collections\Collection;
 use Doctrine\Laminas\Hydrator\DoctrineObject as DoctrineHydrator;
+use Doctrine\Laminas\Hydrator\Strategy\AllowRemoveByValue;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
 use JMS\Serializer\SerializerInterface;
@@ -56,6 +58,8 @@ class TypeHintHydrator
     }
 
     /**
+     * Hydrate an object. This method does not use the Doctrine Hydrator.
+     *
      * @param mixed[] $values
      * @param Constraint|Constraint[] $constraints  The constraint(s) to validate against
      * @param string|GroupSequence|(string|GroupSequence)[]|null $groups  The validation groups to validate. If none is given, "Default" is assumed
@@ -79,12 +83,7 @@ class TypeHintHydrator
 
         // If the target object is a Doctrine entity, use the Doctrine hydrator. Otherwise use the Reflection hydrator
         $properties = $this->reflectionTarget->getProperties();
-        $entityManager = $this->getManagerForClass($this->reflectionTarget->getName());
-        $hydrator = (
-            $entityManager instanceof EntityManagerInterface ?
-                new DoctrineHydrator($entityManager, $this->reflectionTarget->getName()) :
-                new ReflectionHydrator()
-        );
+        $hydrator = new ReflectionHydrator();
         foreach ($properties as $property) {
             $propertyName = $property->getName();
             $propertyMetadata = $this->classMetadata->getPropertyMetadata($propertyName);
@@ -103,7 +102,67 @@ class TypeHintHydrator
     }
 
     /**
-     * @param Constraint|Constraint[]|null $constraints  The constraint(s) to validate against
+     * Hydrate an object or entity. This method uses the Doctrine Hydrator if the object is an entity.
+     *
+     * @param mixed[] $values
+     * @param Constraint|Constraint[] $constraints  The constraint(s) to validate against
+     * @param string|GroupSequence|(string|GroupSequence)[]|null $groups  The validation groups to validate. If none is given, "Default" is assumed
+     *
+     * @throws \Laminas\Hydrator\Exception\InvalidArgumentException
+     */
+    public function hydrateEntity(array $values, object $target, bool $validate = true, $constraints = null, $groups = null): object
+    {
+        $this->currentTarget = $target;
+        $this->reflectionTarget = new ReflectionClass($target);
+        $this->classMetadata = (new AttributeHandler())->loadMetadataForClass($this->reflectionTarget);
+        $this->metadataCache[$this->reflectionTarget->getName()] = $this->classMetadata;
+
+        if ($this->classMetadata->exclude) {
+            return $target;
+        }
+
+        $hydratedObject = $target;
+
+        // If the target object is a Doctrine entity, use the Doctrine hydrator. Otherwise use the Reflection hydrator
+        $properties = $this->reflectionTarget->getProperties();
+        $entityManager = $this->getManagerForClass($this->reflectionTarget->getName());
+        if ($entityManager instanceof EntityManagerInterface) {
+            $hydrator = new DoctrineHydrator($entityManager);
+            foreach ($properties as $property) {
+                $propertyName = $property->getName();
+                $propertyMetadata = $this->classMetadata->getPropertyMetadata($propertyName);
+                if ($propertyMetadata === null || !$propertyMetadata->exclude) {
+                    $property->setAccessible(true);
+                    $strategy = (
+                        $property->isInitialized($target) && $property->getValue($target) instanceof Collection ?
+                            new AllowRemoveByValue() :
+                            new PropertyTypeHintStrategy($property, $this->reflectionTarget, $this, $target)
+                    );
+                    $hydrator->addStrategy($propertyName, $strategy);
+                }
+            }
+        } else {
+            $hydrator = new ReflectionHydrator();
+            foreach ($properties as $property) {
+                $propertyName = $property->getName();
+                $propertyMetadata = $this->classMetadata->getPropertyMetadata($propertyName);
+                if ($propertyMetadata === null || !$propertyMetadata->exclude) {
+                    $strategy = new PropertyTypeHintStrategy($property, $this->reflectionTarget, $this, $target);
+                    $hydrator->addStrategy($propertyName, $strategy);
+                }
+            }
+        }
+        $hydratedObject = $hydrator->hydrate($values, $target);
+
+        if ($validate) {
+            $this->errors = $this->validator->validate($hydratedObject, $constraints, $groups);
+        }
+
+        return $hydratedObject;
+    }
+
+    /**
+     * @param Constraint|Constraint[] $constraints  The constraint(s) to validate against
      * @param string|GroupSequence|(string|GroupSequence)[]|null $groups  The validation groups to validate. If none is given, "Default" is assumed
      */
     public function handleRequest(
@@ -114,6 +173,15 @@ class TypeHintHydrator
         string|GroupSequence|array|null $groups = null
     ): object {
         return $this->hydrateObject($request->request->all(), $target, $validate, $constraints, $groups);
+    }
+
+    /**
+     * @param Constraint|Constraint[] $constraints  The constraint(s) to validate against
+     * @param string|GroupSequence|(string|GroupSequence)[]|null $groups  The validation groups to validate. If none is given, "Default" is assumed
+     */
+    public function handleEntityRequest(Request $request, object $target, bool $validate = true, $constraints = null, $groups = null): object
+    {
+        return $this->hydrateEntity($request->request->all(), $target, $validate, $constraints, $groups);
     }
 
     /** @phpstan-impure */
