@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Xact\TypeHintHydrator\DependencyInjection;
 
 use Symfony\Component\Config\FileLocator;
@@ -11,7 +13,6 @@ class XactTypeHintHydratorExtension extends Extension
 {
     /**
      * @param mixed[] $configs
-     *
      * @phpcsSuppress SlevomatCodingStandard.Functions.UnusedParameter.UnusedParameter
      */
     public function load(array $configs, ContainerBuilder $container): void

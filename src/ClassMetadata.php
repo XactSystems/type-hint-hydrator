@@ -63,7 +63,7 @@ class ClassMetadata
             return $class;
         }
         $namespacedClass = "{$this->nameSpace}\\{$class}";
-        if (class_exists($namespacedClass)) {
+        if (class_exists($namespacedClass, false)) {
             return $namespacedClass;
         }
         return null;

@@ -1,7 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Xact\TypeHintHydrator;
 
+use Doctrine\Common\Collections\Collection;
+use Doctrine\Laminas\Hydrator\DoctrineObject as DoctrineHydrator;
+use Doctrine\Laminas\Hydrator\Strategy\AllowRemoveByValue;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
 use JMS\Serializer\SerializerInterface;
@@ -29,8 +34,8 @@ class TypeHintHydrator
     protected ?object $currentTarget;
     protected ?ReflectionClass $reflectionTarget;
     protected ConverterInterface $typeConverter;
-    /** @var array<string,ClassMetadata> */
-    protected $metadataCache = [];
+    /** @var array<string, ClassMetadata> */
+    protected array $metadataCache = [];
 
     public function __construct(ValidatorInterface $validator, ManagerRegistry $doctrineRegistry, SerializerInterface $serializer)
     {
@@ -53,10 +58,11 @@ class TypeHintHydrator
     }
 
     /**
+     * Hydrate an object. This method does not use the Doctrine Hydrator.
+     *
      * @param mixed[] $values
      * @param Constraint|Constraint[] $constraints  The constraint(s) to validate against
      * @param string|GroupSequence|(string|GroupSequence)[]|null $groups  The validation groups to validate. If none is given, "Default" is assumed
-     *
      * @throws \Laminas\Hydrator\Exception\InvalidArgumentException
      */
     public function hydrateObject(
@@ -67,7 +73,7 @@ class TypeHintHydrator
         string|GroupSequence|array|null $groups = null
     ): object {
         $this->currentTarget = $target;
-        $this->reflectionTarget = $this->getReflectionTarget($target);
+        $this->reflectionTarget = new ReflectionClass($target);
         $this->classMetadata = (new AttributeHandler())->loadMetadataForClass($this->reflectionTarget);
         $this->metadataCache[$this->reflectionTarget->getName()] = $this->classMetadata;
 
@@ -75,25 +81,18 @@ class TypeHintHydrator
             return $target;
         }
 
-        /**
-         * Build a list of strategies for each property in the target object.
-         */
-        $strategies = [];
+        // If the target object is a Doctrine entity, use the Doctrine hydrator. Otherwise use the Reflection hydrator
         $properties = $this->reflectionTarget->getProperties();
+        $hydrator = new ReflectionHydrator();
         foreach ($properties as $property) {
             $propertyName = $property->getName();
             $propertyMetadata = $this->classMetadata->getPropertyMetadata($propertyName);
             if ($propertyMetadata === null || !$propertyMetadata->exclude) {
-                $strategies[$propertyName] = new PropertyTypeHintStrategy($property, $this->reflectionTarget, $this, $target);
+                $strategy = new PropertyTypeHintStrategy($property, $this->reflectionTarget, $this, $target);
+                $hydrator->addStrategy($propertyName, $strategy);
             }
         }
-
-        $hydrator = new ReflectionHydrator();
-        foreach ($strategies as $key => $strategy) {
-            $hydrator->addStrategy($key, $strategy);
-        }
-
-        $hydratedObject = $hydrator->hydrate($values, $target, true);
+        $hydratedObject = $hydrator->hydrate($values, $target);
 
         if ($validate) {
             $this->errors = $this->validator->validate($hydratedObject, $constraints, $groups);
@@ -103,7 +102,67 @@ class TypeHintHydrator
     }
 
     /**
-     * @param Constraint|Constraint[]|null $constraints  The constraint(s) to validate against
+     * Hydrate an object or entity. This method uses the Doctrine Hydrator if the object is an entity.
+     *
+     * @param mixed[] $values
+     * @param Constraint|Constraint[] $constraints  The constraint(s) to validate against
+     * @param string|GroupSequence|(string|GroupSequence)[]|null $groups  The validation groups to validate. If none is given, "Default" is assumed
+     *
+     * @throws \Laminas\Hydrator\Exception\InvalidArgumentException
+     */
+    public function hydrateEntity(array $values, object $target, bool $validate = true, $constraints = null, $groups = null): object
+    {
+        $this->currentTarget = $target;
+        $this->reflectionTarget = new ReflectionClass($target);
+        $this->classMetadata = (new AttributeHandler())->loadMetadataForClass($this->reflectionTarget);
+        $this->metadataCache[$this->reflectionTarget->getName()] = $this->classMetadata;
+
+        if ($this->classMetadata->exclude) {
+            return $target;
+        }
+
+        $hydratedObject = $target;
+
+        // If the target object is a Doctrine entity, use the Doctrine hydrator. Otherwise use the Reflection hydrator
+        $properties = $this->reflectionTarget->getProperties();
+        $entityManager = $this->getManagerForClass($this->reflectionTarget->getName());
+        if ($entityManager instanceof EntityManagerInterface) {
+            $hydrator = new DoctrineHydrator($entityManager);
+            foreach ($properties as $property) {
+                $propertyName = $property->getName();
+                $propertyMetadata = $this->classMetadata->getPropertyMetadata($propertyName);
+                if ($propertyMetadata === null || !$propertyMetadata->exclude) {
+                    $property->setAccessible(true);
+                    $strategy = (
+                        $property->isInitialized($target) && $property->getValue($target) instanceof Collection ?
+                            new AllowRemoveByValue() :
+                            new PropertyTypeHintStrategy($property, $this->reflectionTarget, $this, $target)
+                    );
+                    $hydrator->addStrategy($propertyName, $strategy);
+                }
+            }
+        } else {
+            $hydrator = new ReflectionHydrator();
+            foreach ($properties as $property) {
+                $propertyName = $property->getName();
+                $propertyMetadata = $this->classMetadata->getPropertyMetadata($propertyName);
+                if ($propertyMetadata === null || !$propertyMetadata->exclude) {
+                    $strategy = new PropertyTypeHintStrategy($property, $this->reflectionTarget, $this, $target);
+                    $hydrator->addStrategy($propertyName, $strategy);
+                }
+            }
+        }
+        $hydratedObject = $hydrator->hydrate($values, $target);
+
+        if ($validate) {
+            $this->errors = $this->validator->validate($hydratedObject, $constraints, $groups);
+        }
+
+        return $hydratedObject;
+    }
+
+    /**
+     * @param Constraint|Constraint[] $constraints  The constraint(s) to validate against
      * @param string|GroupSequence|(string|GroupSequence)[]|null $groups  The validation groups to validate. If none is given, "Default" is assumed
      */
     public function handleRequest(
@@ -116,16 +175,28 @@ class TypeHintHydrator
         return $this->hydrateObject($request->request->all(), $target, $validate, $constraints, $groups);
     }
 
+    /**
+     * @param Constraint|Constraint[] $constraints  The constraint(s) to validate against
+     * @param string|GroupSequence|(string|GroupSequence)[]|null $groups  The validation groups to validate. If none is given, "Default" is assumed
+     */
+    public function handleEntityRequest(Request $request, object $target, bool $validate = true, $constraints = null, $groups = null): object
+    {
+        return $this->hydrateEntity($request->request->all(), $target, $validate, $constraints, $groups);
+    }
+
+    /** @phpstan-impure */
     public function isValid(): bool
     {
         return (count($this->errors) === 0);
     }
 
+    /** @phpstan-impure */
     public function getErrors(): ConstraintViolationListInterface
     {
         return $this->errors;
     }
 
+    /** @phpstan-impure */
     public function getJsonErrors(): string
     {
         return $this->serializer->serialize($this->errors, self::JSON_FORMAT);
@@ -149,7 +220,6 @@ class TypeHintHydrator
 
     /**
      * @return mixed
-     *
      * @throws \ReflectionException
      */
     public function getOriginalValue(string $propertyName): ?ReflectionProperty
@@ -161,14 +231,6 @@ class TypeHintHydrator
         }
 
         return null;
-    }
-
-    protected function getReflectionTarget(object $object): ReflectionClass
-    {
-        // return a ReflectionClass object for the entity. If $target is a proxy, return it for the base entity.
-        $proxyOrEntityClassName = get_class($object);
-        $entityClassName = $this->doctrineRegistry->getManagerForClass($proxyOrEntityClassName)->getClassMetadata($proxyOrEntityClassName)->getName();
-        return new ReflectionClass($proxyOrEntityClassName === $entityClassName ? $object : get_parent_class($object));
     }
 
     protected function addMetadataCacheClass(string $className): void

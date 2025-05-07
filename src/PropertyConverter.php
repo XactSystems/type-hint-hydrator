@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Xact\TypeHintHydrator;
 
 use Doctrine\Common\Collections\ArrayCollection;
@@ -170,7 +172,7 @@ class PropertyConverter
         do {
             $converter = $this->entityHydrator->getConverter();
             if ($converter->canConvert($type)) {
-                return $converter->convert($type, $value);
+                return $converter->convert($type, $value, $this->targetProperty, $this->targetObject);
             }
 
             // If it's a class, see if it's an entity, or instantiate it, and hydrate it
@@ -249,7 +251,7 @@ class PropertyConverter
         }
 
         // If the @var annotation exists, append those types. For iterable types we use the @var definition for the array type.
-        $matches = Strings::match($property->getDocComment(), '/@var ((?:(?:[\w|\\\\]+(?:<(?:\w+,\s*)?[\w|\\\\]+>)?))(?:\[])?)/');
+        $matches = Strings::match((string)$property->getDocComment(), '/@var ((?:(?:[\w|\\\\]+(?:<(?:\w+,\s*)?[\w|\\\\]+>)?))(?:\[])?)/');
         $varTypes = is_array($matches) ? $matches[1] : '';
         if ($varTypes) {
             $this->hasTypeHint = true;
@@ -356,7 +358,7 @@ class PropertyConverter
     private function resolveAllowedArrayTypes(string $definition): array
     {
         return $this->normaliseTypes(...array_map(
-            function (string $type): ?string {
+            static function (string $type): ?string {
                 if (! $type) {
                     return null;
                 }
