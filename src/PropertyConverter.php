@@ -208,7 +208,7 @@ class PropertyConverter
                             $idField = $em->getClassMetadata($type)->getSingleIdentifierFieldName();
                             if (array_key_exists($idField, $value) && !empty($value[$idField])) {
                                 $entity = $em->getRepository($propertyClass)->find($value[$idField]);
-                                $this->entityHydrator->hydrateObject($value, $entity, false);
+                                $this->entityHydrator->hydrateEntity($value, $entity, false);
                                 return $entity;
                             }
                         }
