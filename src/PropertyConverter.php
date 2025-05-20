@@ -211,7 +211,7 @@ class PropertyConverter
                             if (array_key_exists($idField, $value) && !empty($value[$idField])) {
                                 $entity = $om->find($propertyClass, $value[$idField]);
                                 $om->initializeObject($entity); // Required for proxied entities.
-                                $this->entityHydrator->hydrateObject($value, $entity, false);
+                                $this->entityHydrator->hydrateEntity($value, $entity, false);
                                 return $entity;
                             }
                         }
