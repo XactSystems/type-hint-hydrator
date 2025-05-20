@@ -1,16 +1,21 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Xact\TypeHintHydrator;
 
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping\MappingException;
+use Doctrine\Persistence\Mapping\MappingException as PersistenceMappingException;
 use InvalidArgumentException;
 use Nette\Utils\Arrays;
 use Nette\Utils\Strings;
 use ReflectionClass;
+use ReflectionIntersectionType;
 use ReflectionNamedType;
 use ReflectionProperty;
+use ReflectionUnionType;
 
 class PropertyConverter
 {
@@ -34,7 +39,10 @@ class PropertyConverter
     protected array $allowedArrayTypes;
 
     /** @var string[] */
-    protected array $convertibleTypes = [];
+    protected array $convertibleTypes = [
+        'integer' => 'int',
+        'boolean' => 'bool',
+    ];
 
     /** @var string[] */
     protected array $ignoredDeclaredTypes = ['self', 'parent', 'callable', 'object'];
@@ -53,11 +61,7 @@ class PropertyConverter
         $this->configureTypeAttributes();
     }
 
-    /**
-     * @param mixed $value
-     * @return mixed
-     */
-    public function convert($value)
+    public function convert(mixed $value): mixed
     {
         /**
          * String types can receive the value as is as the Request parameters are all string values or arrays.
@@ -88,7 +92,7 @@ class PropertyConverter
              * If the value is an array and the type ends in [], process the value as an array and try
              * to convert each element to type.
              */
-            if (is_array($value) && Strings::endsWith($type, '[]')) {
+            if (is_array($value) && str_ends_with($type, '[]')) {
                 $propertyType = $this->getQualifiedClassName(Strings::before($type, '[]'));
                 $convertedValue = [];
                 foreach ($value as $subItem) {
@@ -105,7 +109,7 @@ class PropertyConverter
                  * Skip Collection class without a subtype. This will be the >= 7.4 typed property definition.
                  * If this is the only allowed type, no @var, simply add the value to the collection.
                  */
-                if (!Strings::contains($type, '<') && is_a($type, Collection::class, true)) {
+                if (!str_contains($type, '<') && is_a($type, Collection::class, true)) {
                     if (count($this->allowedTypes) > 1) {
                         continue; // Wait for the @var definition with the <subtype>
                     }
@@ -138,9 +142,9 @@ class PropertyConverter
                             foreach ($convertedValue as $oldChild) {
                                 if (!$hydratedChildren->contains($oldChild)) {
                                     $convertedValue->removeElement($oldChild);
-                                    $em = $this->entityHydrator->getManagerForClass($subType);
-                                    if ($em !== null) {
-                                        $em->remove($oldChild);
+                                    $om = $this->entityHydrator->getManagerForClass($subType);
+                                    if ($om !== null) {
+                                        $om->remove($oldChild);
                                     }
                                 }
                             }
@@ -162,11 +166,7 @@ class PropertyConverter
         return $value;
     }
 
-    /**
-     * @param mixed $value
-     * @return mixed
-     */
-    private function convertToNativeTypeOrEntity($value, string $type)
+    private function convertToNativeTypeOrEntity(mixed $value, string $type): mixed
     {
         // Attempt to cast to native types or entities.
         do {
@@ -185,12 +185,14 @@ class PropertyConverter
                 if (is_scalar($value) && !$this->propertyMetadata->skipFind) {
                     try {
                         // If property type is an entity, try and load that entity
-                        $em = $this->entityHydrator->getManagerForClass($propertyClass);
-                        if ($em !== null) {
-                            $em->getClassMetadata($propertyClass)->getSingleIdentifierFieldName();
-                            return $em->getRepository($propertyClass)->find($value);
+                        $om = $this->entityHydrator->getManagerForClass($propertyClass);
+                        if ($om !== null) {
+                            $om->getClassMetadata($propertyClass)->getSingleIdentifierFieldName();
+                            $entity = $om->find($propertyClass, $value);
+                            $om->initializeObject($entity); // Required for proxied entities.
+                            return $entity;
                         }
-                    } catch (MappingException $e) {
+                    } catch (MappingException | PersistenceMappingException $e) {
                         // Ignore, it's either not an entity or the key does not exist
                     }
                 }
@@ -203,16 +205,19 @@ class PropertyConverter
                 if (is_array($value) && !$this->propertyMetadata->skipFind) {
                     try {
                         // If property type is an entity, and we have the ID field in the values list, try and find and hydrate that entity
-                        $em = $this->entityHydrator->getManagerForClass($propertyClass);
-                        if ($em !== null) {
-                            $idField = $em->getClassMetadata($type)->getSingleIdentifierFieldName();
+                        $om = $this->entityHydrator->getManagerForClass($propertyClass);
+                        if ($om !== null) {
+                            $idField = $om->getClassMetadata($type)->getSingleIdentifierFieldName();
                             if (array_key_exists($idField, $value) && !empty($value[$idField])) {
-                                $entity = $em->getRepository($propertyClass)->find($value[$idField]);
+                                $entity = $om->find($propertyClass, $value[$idField]);
+                                $om->initializeObject($entity); // Required for proxied entities.
                                 $this->entityHydrator->hydrateEntity($value, $entity, false);
                                 return $entity;
                             }
                         }
                     } catch (MappingException $e) {
+                        // Ignore, the class is not an entity, does not have an identity or the identifier is composite
+                    } catch (PersistenceMappingException $e) {
                     }
 
                     /**
@@ -246,7 +251,7 @@ class PropertyConverter
         }
 
         // If the @var annotation exists, append those types. For iterable types we use the @var definition for the array type.
-        $matches = Strings::match($property->getDocComment(), '/@var ((?:(?:[\w|\\\\]+(?:<(?:\w+,\s*)?[\w|\\\\]+>)?))(?:\[])?)/');
+        $matches = Strings::match((string)$property->getDocComment(), '/@var ((?:(?:[\w|\\\\]+(?:<(?:\w+,\s*)?[\w|\\\\]+>)?))(?:\[])?)/');
         $varTypes = is_array($matches) ? $matches[1] : '';
         if ($varTypes) {
             $this->hasTypeHint = true;
@@ -256,7 +261,7 @@ class PropertyConverter
                 $definition = $varTypes;
             } else {
                 // Otherwise the declared type takes precedence
-                $definition = $definition .= ($definition ? '|' : '') . $varTypes;
+                $definition .= ($definition ? '|' : '') . $varTypes;
             }
         }
 
@@ -281,6 +286,13 @@ class PropertyConverter
         switch (get_class($reflectionType)) {
             case ReflectionNamedType::class:
                 return $this->resolveTypedProperty($reflectionType);
+            case ReflectionUnionType::class:
+            case ReflectionIntersectionType::class:
+                $types = '';
+                foreach ($reflectionType->getTypes() as $type) {
+                    $type .= ($types ? '|' : '') . $this->resolveTypedProperty($type);
+                }
+                return $types;
         }
 
         return '';
@@ -304,7 +316,7 @@ class PropertyConverter
             return true;
         }
 
-        if (Strings::contains($definition, 'mixed') || Strings::contains($definition, 'null') || Strings::contains($definition, '?')) {
+        if (str_contains($definition, 'mixed') || str_contains($definition, 'null') || str_contains($definition, '?')) {
             return true;
         }
 
@@ -314,17 +326,17 @@ class PropertyConverter
     private function resolveIsIterable(string $definition): bool
     {
         return (
-            Strings::contains($definition, 'array')
-            || Strings::contains($definition, 'iterable')
-            || Strings::endsWith($definition, '[]')
-            || Strings::contains($definition, '<') && Strings::endsWith($definition, '>')
+            str_contains($definition, 'array')
+            || str_contains($definition, 'iterable')
+            || str_ends_with($definition, '[]')
+            || str_contains($definition, '<') && str_ends_with($definition, '>')
             || (class_exists($definition) || interface_exists($definition)) && array_key_exists(\Traversable::class, class_implements($definition))
         );
     }
 
     private function resolveIsMixed(string $definition): bool
     {
-        return Strings::contains($definition, 'mixed');
+        return str_contains($definition, 'mixed');
     }
 
     private function resolveIsMixedArray(string $definition): bool
@@ -346,7 +358,7 @@ class PropertyConverter
     private function resolveAllowedArrayTypes(string $definition): array
     {
         return $this->normaliseTypes(...array_map(
-            function (string $type): ?string {
+            static function (string $type): ?string {
                 if (! $type) {
                     return null;
                 }
@@ -376,7 +388,7 @@ class PropertyConverter
     {
         return array_filter(array_map(
             function (?string $type) {
-                return self::$convertibleTypes[$type] ?? $type;
+                return $this->convertibleTypes[$type] ?? $type;
             },
             $types
         ));
@@ -384,7 +396,7 @@ class PropertyConverter
 
     private function prefixClass(string $className): string
     {
-        return (Strings::startsWith($className, '\\')) ? $className : '\\' . $className;
+        return (str_starts_with($className, '\\')) ? $className : '\\' . $className;
     }
 
     private function getQualifiedClassName(string $propertyType): string

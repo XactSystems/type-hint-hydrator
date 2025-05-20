@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Xact\TypeHintHydrator;
 
 use Laminas\Hydrator\Strategy\StrategyInterface;
@@ -23,7 +25,7 @@ class PropertyTypeHintStrategy implements StrategyInterface
      * @return mixed       Returns the value that should be extracted.
      */
      // phpcs:ignore SlevomatCodingStandard.Functions.UnusedParameter.UnusedParameter
-    public function extract($value, ?object $object = null)
+    public function extract(mixed $value, ?object $object = null): mixed
     {
         return $value;
     }
@@ -36,7 +38,7 @@ class PropertyTypeHintStrategy implements StrategyInterface
      * @return mixed      Returns the value that should be hydrated.
      */
      // phpcs:ignore SlevomatCodingStandard.Functions.UnusedParameter.UnusedParameter
-    public function hydrate($value, ?array $data = null)
+    public function hydrate(mixed $value, ?array $data = null): mixed
     {
         return $this->Converter->convert($value);
     }

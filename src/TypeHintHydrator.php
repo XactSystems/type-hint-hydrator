@@ -8,12 +8,14 @@ use Doctrine\Common\Collections\Collection;
 use Doctrine\Laminas\Hydrator\DoctrineObject as DoctrineHydrator;
 use Doctrine\Laminas\Hydrator\Strategy\AllowRemoveByValue;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\Persistence\ManagerRegistry;
 use JMS\Serializer\SerializerInterface;
-use Laminas\Hydrator\ReflectionHydrator;
 use Nette\Utils\Strings;
 use ReflectionClass;
-use Symfony\Bridge\Doctrine\RegistryInterface;
+use ReflectionProperty;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\Validator\Constraint;
+use Symfony\Component\Validator\Constraints\GroupSequence;
 use Symfony\Component\Validator\ConstraintViolationList;
 use Symfony\Component\Validator\ConstraintViolationListInterface;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
@@ -25,17 +27,17 @@ class TypeHintHydrator
     protected const JSON_FORMAT = 'json';
 
     protected ValidatorInterface $validator;
-    protected RegistryInterface $doctrineRegistry;
+    protected ManagerRegistry $doctrineRegistry;
     protected SerializerInterface $serializer;
     protected ?ClassMetadata $classMetadata = null;
     protected ConstraintViolationListInterface $errors;
     protected ?object $currentTarget;
     protected ?ReflectionClass $reflectionTarget;
     protected ConverterInterface $typeConverter;
-    /** @var array<string,ClassMetadata> */
-    protected $metadataCache = [];
+    /** @var array<string, ClassMetadata> */
+    protected array $metadataCache = [];
 
-    public function __construct(ValidatorInterface $validator, RegistryInterface $doctrineRegistry, SerializerInterface $serializer)
+    public function __construct(ValidatorInterface $validator, ManagerRegistry $doctrineRegistry, SerializerInterface $serializer)
     {
         $this->validator = $validator;
         $this->doctrineRegistry = $doctrineRegistry;
@@ -61,21 +63,23 @@ class TypeHintHydrator
      * @param mixed[] $values
      * @param Constraint|Constraint[] $constraints  The constraint(s) to validate against
      * @param string|GroupSequence|(string|GroupSequence)[]|null $groups  The validation groups to validate. If none is given, "Default" is assumed
-     *
      * @throws \Laminas\Hydrator\Exception\InvalidArgumentException
      */
-    public function hydrateObject(array $values, object $target, bool $validate = true, $constraints = null, $groups = null): object
-    {
+    public function hydrateObject(
+        array $values,
+        object $target,
+        bool $validate = true,
+        Constraint|array $constraints = null,
+        string|GroupSequence|array|null $groups = null
+    ): object {
         $this->currentTarget = $target;
         $this->reflectionTarget = new ReflectionClass($target);
-        $this->classMetadata = (new AnnotationHandler())->loadMetadataForClass($this->reflectionTarget);
+        $this->classMetadata = (new AttributeHandler())->loadMetadataForClass($this->reflectionTarget);
         $this->metadataCache[$this->reflectionTarget->getName()] = $this->classMetadata;
 
         if ($this->classMetadata->exclude) {
             return $target;
         }
-
-        $hydratedObject = $target;
 
         // If the target object is a Doctrine entity, use the Doctrine hydrator. Otherwise use the Reflection hydrator
         $properties = $this->reflectionTarget->getProperties();
@@ -110,7 +114,7 @@ class TypeHintHydrator
     {
         $this->currentTarget = $target;
         $this->reflectionTarget = new ReflectionClass($target);
-        $this->classMetadata = (new AnnotationHandler())->loadMetadataForClass($this->reflectionTarget);
+        $this->classMetadata = (new AttributeHandler())->loadMetadataForClass($this->reflectionTarget);
         $this->metadataCache[$this->reflectionTarget->getName()] = $this->classMetadata;
 
         if ($this->classMetadata->exclude) {
@@ -161,8 +165,13 @@ class TypeHintHydrator
      * @param Constraint|Constraint[] $constraints  The constraint(s) to validate against
      * @param string|GroupSequence|(string|GroupSequence)[]|null $groups  The validation groups to validate. If none is given, "Default" is assumed
      */
-    public function handleRequest(Request $request, object $target, bool $validate = true, $constraints = null, $groups = null): object
-    {
+    public function handleRequest(
+        Request $request,
+        object $target,
+        bool $validate = true,
+        Constraint|array|null $constraints = null,
+        string|GroupSequence|array|null $groups = null
+    ): object {
         return $this->hydrateObject($request->request->all(), $target, $validate, $constraints, $groups);
     }
 
@@ -202,7 +211,7 @@ class TypeHintHydrator
     public function getManagerForClass(string $className): ?EntityManagerInterface
     {
         // Doctrine will not find a match if the class name is prefixed with a '\'. Oh the joy of consistency!
-        if (Strings::startsWith($className, '\\')) {
+        if (str_starts_with($className, '\\')) {
             $className = Strings::substring($className, 1);
         }
 
@@ -210,21 +219,10 @@ class TypeHintHydrator
     }
 
     /**
-     * TODO - Remove this in the next major release (4.0)
-     *
-     * @deprecated Depreciated since 3.4.5 and will be removed in 4.0. Use getManagerForClass() instead.
-     */
-    public function getEntityManagerForClass(string $className): ?EntityManagerInterface
-    {
-        return $this->getManagerForClass($className);
-    }
-
-    /**
      * @return mixed
-     *
      * @throws \ReflectionException
      */
-    public function getOriginalValue(string $propertyName)
+    public function getOriginalValue(string $propertyName): ?ReflectionProperty
     {
         if ($this->currentTarget && $this->reflectionTarget && $this->reflectionTarget->hasProperty($propertyName)) {
             $property = $this->reflectionTarget->getProperty($propertyName);
@@ -238,7 +236,7 @@ class TypeHintHydrator
     protected function addMetadataCacheClass(string $className): void
     {
         if (class_exists($className) && !array_key_exists($className, $this->metadataCache)) {
-            $this->metadataCache[$className] = (new AnnotationHandler())->loadMetadataForClass(new ReflectionClass($className));
+            $this->metadataCache[$className] = (new AttributeHandler())->loadMetadataForClass(new ReflectionClass($className));
         }
     }
 }

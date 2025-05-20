@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Xact\TypeHintHydrator\Converter;
 
 use InvalidArgumentException;
@@ -13,7 +15,8 @@ use Xact\TypeHintHydrator\Converter\Types\TypeConverterInterface;
 
 class Converter implements ConverterInterface
 {
-    protected $convertibleTypes = [];
+    /** @var array<string, class-string> */
+    protected array $convertibleTypes = [];
 
     public function __construct()
     {
@@ -35,7 +38,7 @@ class Converter implements ConverterInterface
     /**
      * @inheritDoc
      */
-    public function convert(string $type, $value, ReflectionProperty $property, object $targetObject)
+    public function convert(string $type, mixed $value, ReflectionProperty $property, object $targetObject): mixed
     {
         if (!$this->canConvert($type)) {
             $validTypes = array_keys($this->convertibleTypes);
