@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Xact\TypeHintHydrator;
 
-use Doctrine\Common\Collections\Collection;
 use Doctrine\Laminas\Hydrator\DoctrineObject as DoctrineHydrator;
 use Doctrine\Laminas\Hydrator\Strategy\AllowRemoveByValue;
 use Doctrine\ORM\EntityManagerInterface;
@@ -109,7 +108,7 @@ class TypeHintHydrator
     public function hydrateEntity(array $values, object $target, bool $validate = true, $constraints = null, $groups = null): object
     {
         $this->currentTarget = $target;
-        $this->reflectionTarget = new ReflectionClass($target);
+        $this->reflectionTarget = $this->getReflectionTarget($target);
         $this->classMetadata = (new AnnotationHandler())->loadMetadataForClass($this->reflectionTarget);
         $this->metadataCache[$this->reflectionTarget->getName()] = $this->classMetadata;
 
@@ -124,17 +123,17 @@ class TypeHintHydrator
         $entityManager = $this->getManagerForClass($this->reflectionTarget->getName());
         if ($entityManager instanceof EntityManagerInterface) {
             $hydrator = new DoctrineHydrator($entityManager);
+            $doctrineMetadata = $entityManager->getClassMetadata(get_class($target));
             foreach ($properties as $property) {
                 $propertyName = $property->getName();
                 $propertyMetadata = $this->classMetadata->getPropertyMetadata($propertyName);
                 if ($propertyMetadata === null || !$propertyMetadata->exclude) {
                     $property->setAccessible(true);
-                    $strategy = (
-                        $property->isInitialized($target) && $property->getValue($target) instanceof Collection ?
-                            new AllowRemoveByValue() :
-                            new PropertyTypeHintStrategy($property, $this->reflectionTarget, $this, $target)
-                    );
-                    $hydrator->addStrategy($propertyName, $strategy);
+                    if ($doctrineMetadata->isCollectionValuedAssociation($propertyName)) {
+                        $hydrator->addStrategy($propertyName, new AllowRemoveByValue());
+                    } else {
+                        $hydrator->addStrategy($propertyName, new PropertyTypeHintStrategy($property, $this->reflectionTarget, $this, $target));
+                    }
                 }
             }
         } else {
@@ -240,5 +239,14 @@ class TypeHintHydrator
         if (class_exists($className) && !array_key_exists($className, $this->metadataCache)) {
             $this->metadataCache[$className] = (new AnnotationHandler())->loadMetadataForClass(new ReflectionClass($className));
         }
+    }
+
+    protected function getReflectionTarget(object $object): ReflectionClass
+    {
+        // return a ReflectionClass object for the entity. If $target is a proxy, return it for the base entity.
+        $proxyOrEntityClassName = get_class($object);
+        $entityManager = $this->doctrineRegistry->getManagerForClass($proxyOrEntityClassName);
+        $entityClassName = $entityManager ? $entityManager->getClassMetadata($proxyOrEntityClassName)->getName() : $proxyOrEntityClassName;
+        return new ReflectionClass($proxyOrEntityClassName === $entityClassName ? $object : get_parent_class($object));
     }
 }
