@@ -55,9 +55,8 @@ class ClassMetadata
      */
     public function getQualifiedClassName(string $class): ?string
     {
-        $loweredClass = strtolower($class);
-        if (array_key_exists($loweredClass, $this->useStatements)) {
-            return $this->useStatements[$loweredClass];
+        if (array_key_exists($class, $this->useStatements)) {
+            return $this->useStatements[$class];
         }
         if (array_search($class, $this->useStatements) !== false) {
             return $class;
