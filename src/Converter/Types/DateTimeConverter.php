@@ -16,6 +16,10 @@ class DateTimeConverter implements TypeConverterInterface
     {
         $dateTimeObject = ($value instanceof \DateTime ? $value : new \DateTime($value));
         $property->setAccessible(true);
+        // If the target property hasn't been initialised, use the new value.
+        if (!$property->isInitialized($targetObject)) {
+            return $dateTimeObject;
+        }
         // If the date-time value hasn't changed, keep the original DateTime object.
         if (($currentDateTimeObject = $property->getValue($targetObject)) instanceof \DateTime) {
             if ($currentDateTimeObject == $dateTimeObject) {

@@ -68,7 +68,7 @@ class TypeHintHydrator
         array $values,
         object $target,
         bool $validate = true,
-        Constraint|array $constraints = null,
+        Constraint|array|null $constraints = null,
         string|GroupSequence|array|null $groups = null
     ): object {
         $this->currentTarget = $target;
@@ -112,7 +112,7 @@ class TypeHintHydrator
         array $values,
         object $target,
         bool $validate = true,
-        Constraint|array $constraints = null,
+        Constraint|array|null $constraints = null,
         string|GroupSequence|array|null $groups = null
     ): object {
         $this->currentTarget = $target;
@@ -179,15 +179,15 @@ class TypeHintHydrator
     }
 
     /**
-     * @param Constraint|Constraint[] $constraints  The constraint(s) to validate against
+     * @param Constraint|Constraint[]|null $constraints  The constraint(s) to validate against
      * @param string|GroupSequence|(string|GroupSequence)[]|null $groups  The validation groups to validate. If none is given, "Default" is assumed
      */
     public function handleEntityRequest(
         Request $request,
         object $target,
         bool $validate = true,
-        Constraint|array $constraints = null,
-        string|GroupSequence|array $groups = null
+        Constraint|array|null $constraints = null,
+        string|GroupSequence|array|null $groups = null
     ): object {
         return $this->hydrateEntity($request->request->all(), $target, $validate, $constraints, $groups);
     }
